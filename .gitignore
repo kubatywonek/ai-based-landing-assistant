@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+env/
+build/
+dist/
+*.log
+env/
+venv/
+.conda/
+miniconda3/
+*.log
+build/
+dist/
+*.egg-info/
