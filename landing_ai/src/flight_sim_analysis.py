@@ -1,4 +1,7 @@
-def test_flight_sim(env=None, action=[0.0, 0.0, 0.0], steps=50):
+from jsbsim_wrapper import FlightSimulator
+import time
+
+def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=False):
     """
     Simple test function to validate the FlightSimulator API.
     :param env: FlightSimulator instance
@@ -6,10 +9,13 @@ def test_flight_sim(env=None, action=[0.0, 0.0, 0.0], steps=50):
     :param steps: Number of simulation steps to run
     """
     print("--- API test for JSBSim ---")
+    env = FlightSimulator()
     try:
         if env is None:
             print("No environment provided")
             return
+        if enable_flightgear:
+            env.enable_flightgear() # Optional
         plane_state = env.reset()
         print(f"✓ Environment initialized!")
         print(f"✓ Initial state:")
@@ -20,6 +26,8 @@ def test_flight_sim(env=None, action=[0.0, 0.0, 0.0], steps=50):
             if i % 10 == 0:
                 print(f"Step {i} -> Finished: {done}\n")
                 debug_flight_state(plane_state)
+                if enable_flightgear:
+                    time.sleep(1/Hz)  # Sleep to simulate real-time
                 
         print("\n--- TEST FINISHED ---")
         

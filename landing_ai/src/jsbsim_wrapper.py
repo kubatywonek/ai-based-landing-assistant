@@ -35,7 +35,7 @@ class FlightSimulator:
             "elevation": float # runway elevation [ft]
         }
     """
-    def __init__(self, aircraft="c172x", runway_data=None):
+    def __init__(self, aircraft="c172p", runway_data=None):
         self.jsbsim_path = os.path.dirname(jsbsim.__file__)
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
@@ -179,3 +179,24 @@ class FlightSimulator:
         if h_agl < 1.0 or dist > 5000 or abs(lat_err) > 2000:
             return True
         return False
+    
+    def enable_flightgear(self, host='127.0.0.1', port=5550, rate=60):
+        """
+        Creates an output directive for FlightGear to receive the aircraft state via UDP.
+        :param host: IP address to send the data to (default is localhost)
+        :param port: UDP port to send the data to (default is 5550)
+        :param rate: Rate in Hz at which to send the data (default is 60)
+        """
+        output_xml = f"""<?xml version="1.0"?>
+        <output name="{host}" type="FLIGHTGEAR" port="{port}" protocol="UDP" rate="{rate}">
+        </output>
+        """
+        abs_path = os.path.abspath("fg_conf/fg_out.xml")
+
+        with open(abs_path, "w") as f:
+            f.write(output_xml)
+            
+        if not self.fdm.set_output_directive(abs_path):
+            print("Warning: Failed to initialize FlightGear directive.")
+        else:
+            print(f"UDP visualization enabled on {host}:{port}")
