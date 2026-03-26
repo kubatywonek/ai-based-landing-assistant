@@ -1,4 +1,5 @@
 from jsbsim_wrapper import FlightSimulator
+from jsbsim_config import get_jsbsim_config
 import time
 
 def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=False):
@@ -9,7 +10,12 @@ def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=F
     :param steps: Number of simulation steps to run
     """
     print("--- API test for JSBSim ---")
-    env = FlightSimulator()
+    runway, ic = get_jsbsim_config()
+    if runway is None or ic is None:
+        print("Configuration error: No runway or initial conditions provided.")
+        return
+    env = FlightSimulator(runway_data=runway, initial_conditions=ic)
+    rate = 1.0 / Hz
     try:
         if env is None:
             print("No environment provided")
@@ -17,8 +23,8 @@ def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=F
         if enable_flightgear:
             env.enable_flightgear() # Optional
         plane_state = env.reset()
-        print(f"✓ Environment initialized!")
-        print(f"✓ Initial state:")
+        print(f"Environment initialized!")
+        print(f"Initial state:")
         debug_flight_state(plane_state)
 
         for i in range(steps):
@@ -27,7 +33,7 @@ def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=F
                 print(f"Step {i} -> Finished: {done}\n")
                 debug_flight_state(plane_state)
                 if enable_flightgear:
-                    time.sleep(1/Hz)  # Sleep to simulate real-time
+                    time.sleep(rate)  # Sleep to simulate real-time
                 
         print("\n--- TEST FINISHED ---")
         

@@ -22,6 +22,7 @@ C130		f16			    MD11			sgs233			ZLT-NT
 """
 
 lattitude_to_ft_coef = 364173.0  # Approximate conversion factor from degrees of latitude to feet (varies with latitude)
+cessna_172p_offset = 4.44  # Distance from the center of gravity to the main landing gear (in feet) for the Cessna 172P, used for touchdown detection
 
 class FlightSimulator:
 
@@ -34,45 +35,56 @@ class FlightSimulator:
             "heading": float,  # runway heading (True Heading) [deg]
             "elevation": float # runway elevation [ft]
         }
+    :param initial_conditions: Dictionary with initial aircraft conditions (default: stable approach path)
+        {
+            "h_agl": float,      # height above ground level [ft]
+            "vc_kts": float,     # velocity (IAS) [kts]
+            "dist_ft": float,    # distance from runway threshold [ft]
+            "gamma_deg": float,  # glide path angle [deg]
+            "psi_true_deg": float # initial heading [deg]
+        }
     """
-    def __init__(self, aircraft="c172p", runway_data=None):
+    def __init__(self, aircraft="c172p", runway_data=None, initial_conditions=None):
         self.jsbsim_path = os.path.dirname(jsbsim.__file__)
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
         self.fdm.set_engine_path(os.path.join(self.jsbsim_path, 'engine'))
+        if aircraft is "c172p":
+            self.cg_offset = cessna_172p_offset
+        else:
+            self.cg_offset = 0.0
         
         if not self.fdm.load_model(aircraft):
             raise RuntimeError(f"Could not load model: {aircraft}")
 
-        self.rw_data = runway_data or {
-            "lat": 47.43, 
-            "lon": -122.31, 
-            "heading": 340.0, 
-            "elevation": 433.0
-        }
+        if runway_data is None or initial_conditions is None:
+            raise RuntimeError("Simulation configuration was not provided.")
+        
+        self.rw_data = runway_data
+        self.init_data = initial_conditions
         
         self.reset()
 
     def reset(self):
         """
-        Resets the simulation and returns the initial state.
-        FOR NOW: Sets the plane on a stable approach path 3 miles from the runway, 
-        at 1500 ft AGL, 85 knots, and a 3 degree glide slope.
+        Resets the simulation and returns the initial state and sets up the environment
+        based on the provided runway and initial conditions.
         """
-
-        # Starting parameter (for testing purposes)
-        self.fdm['ic/h-sl-ft'] = self.rw_data["elevation"] + 1500.0  # 1500 ft over runway elevation
-        self.fdm['ic/vc-kts'] = 85.0                                 # IAS (85 knots - ideal for Cessna)
-        self.fdm['ic/gamma-deg'] = -3.0                              # Descent angle (3 degrees down)
-        self.fdm['ic/psi-true-deg'] = self.rw_data["heading"]        # Nose pointed along the runway centerline
-        dist_start_ft = 18228.0                                      # 3 miles from the runway threshold
+        # Starting parameters
+        self.fdm['position/terrain-elevation-asl-ft'] = self.rw_data["elevation"]     # Runway elevation above mean sea level
+        self.fdm['ic/h-sl-ft'] = self.rw_data["elevation"] + self.init_data["h_agl"]  # Starting height above the runway
+        self.fdm['ic/vc-kts'] = self.init_data["vc_kts"]                              # Speed
+        self.fdm['ic/gamma-deg'] = self.init_data["gamma_deg"]                        # Descent angle
+        self.fdm['ic/psi-true-deg'] = self.rw_data["heading"]                         # Nose heading
+        dist_start_ft = self.init_data["dist_ft"]                                     # Distance from runway threshold
 
         # Starting position calculated based on runway data and desired starting distance
         rw_rad = math.radians(self.rw_data["heading"])
         lat_offset = (dist_start_ft * math.cos(rw_rad)) / lattitude_to_ft_coef
         lon_offset = (dist_start_ft * math.sin(rw_rad)) / (lattitude_to_ft_coef * math.cos(math.radians(self.rw_data["lat"])))
-        self.fdm['ic/lat-gc-deg'] = self.rw_data["lat"] - lat_offset
-        self.fdm['ic/long-gc-deg'] = self.rw_data["lon"] - lon_offset
+        
+        self.fdm['ic/lat-geod-deg'] = self.rw_data["lat"] - lat_offset                # Starting latitude
+        self.fdm['ic/long-gc-deg'] = self.rw_data["lon"] - lon_offset                 # Starting longitude
         
         # Simulation initialization (run initial conditions)
         self.fdm.run_ic()
@@ -86,15 +98,16 @@ class FlightSimulator:
         for _ in range(10):
             self.fdm.run()
             
+        self.touchdown = False
         return self.get_state()
 
-    def _get_runway_relative_pos(self):
+    def get_runway_relative_pos(self):
         """
         Calculates the position of the aircraft relative to the runway threshold and centerline.
         Math used: Vector projection onto the local runway coordinate system.
         """
         # Current position of the aircraft [degrees]
-        ac_lat = self.fdm['position/lat-gc-deg']
+        ac_lat = self.fdm['position/lat-geod-deg']
         ac_lon = self.fdm['position/long-gc-deg']
         
         # Conversion of degrees to feet
@@ -123,10 +136,10 @@ class FlightSimulator:
         5: Distance to runway threshold (ft) - negative means we are before the threshold
         6: Lateral deviation from runway centerline (ft) - negative means to the left, positive to the right
         """
-        long_dist, lat_error = self._get_runway_relative_pos()
+        long_dist, lat_error = self.get_runway_relative_pos()
         
         state = [
-            self.fdm['position/h-sl-ft'] - self.rw_data["elevation"], # Height above runway
+            self.fdm['position/h-agl-ft'] - self.cg_offset,           # Height above runway - center of gravity offset
             self.fdm['velocities/v-down-fps'] * -1,                   # Vertical speed
             self.fdm['velocities/u-fps'],                             # Horizontal speed
             self.fdm['attitude/pitch-rad'],                           # Pitch
@@ -164,10 +177,9 @@ class FlightSimulator:
     def _check_if_done(self, state):
         """
         Ending conditions:
-        - Height < 1 foot (Landing/Crash)
+        - Touchdown (landing) detected by wheel contact
         - Exceeding limits (5000 ft from threshold or 2000 ft lateral deviation from the centerline)
         """
-        h_agl = state[0]
         dist = state[5]
         lat_err = state[6]
         
@@ -175,8 +187,18 @@ class FlightSimulator:
         if not state.any(): 
             return True
             
+        # Landing condition
+        left_wheel_touch = self.fdm['gear/unit[1]/WOW']
+        right_wheel_touch = self.fdm['gear/unit[2]/WOW']
+        
+        if left_wheel_touch > 0 or right_wheel_touch > 0:
+            if not self.touchdown:
+                self.touchdown = True
+                print("TOUCHDOWN DETECTED")
+            return True
+        
         # Finishing conditions
-        if h_agl < 1.0 or dist > 5000 or abs(lat_err) > 2000:
+        if dist > 5000 or abs(lat_err) > 2000:
             return True
         return False
     

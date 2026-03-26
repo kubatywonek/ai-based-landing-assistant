@@ -17,5 +17,4 @@ echo "Running FlightGear with cessna 172p, rate 60, listening on localhost:5550.
   --disable-random-buildings \
   --disable-random-vegetation \
   --disable-specular-highlight \
-  --disable-ai-traffic \
-  --disable-terrasync
+  --disable-ai-traffic
