@@ -1,8 +1,8 @@
-from jsbsim_wrapper import FlightSimulator
-from jsbsim_config import get_jsbsim_config
+from sim_env.jsbsim_wrapper import FlightSimulator
+from sim_env.preflight_config import get_jsbsim_config
 import time
 
-def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=False):
+def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=False, default_runway=None):
     """
     Simple test function to validate the FlightSimulator API.
     :param env: FlightSimulator instance
@@ -10,7 +10,7 @@ def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=F
     :param steps: Number of simulation steps to run
     """
     print("--- API test for JSBSim ---")
-    runway, ic = get_jsbsim_config()
+    runway, ic = get_jsbsim_config(preset_runway=default_runway)
     if runway is None or ic is None:
         print("Configuration error: No runway or initial conditions provided.")
         return
@@ -28,12 +28,15 @@ def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=F
         debug_flight_state(plane_state)
 
         for i in range(steps):
-            plane_state, done = env.step(action)
+            plane_state, done, info = env.step(action)
             if i % 10 == 0:
                 print(f"Step {i} -> Finished: {done}\n")
                 debug_flight_state(plane_state)
                 if enable_flightgear:
                     time.sleep(rate)  # Sleep to simulate real-time
+            if done:
+                print("Simulation finished. Status: ", info["status"], ". Reason: ", info["reason"])
+                break
                 
         print("\n--- TEST FINISHED ---")
         

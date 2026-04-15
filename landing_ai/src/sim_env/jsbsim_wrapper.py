@@ -28,7 +28,7 @@ class FlightSimulator:
 
     """
     :param aircraft: plane model (default: Cessna 172)
-    :param runway_data: Dictionary with runway information (default: Seattle-Tacoma Intl, RWY 34L)
+    :param runway_data: Dictionary with runway information
         {
             "lat": float,      # latitude of runway threshold [deg]
             "lon": float,      # longitude of runway threshold [deg]
@@ -166,13 +166,9 @@ class FlightSimulator:
             self.fdm.run()
             
         state = self.get_state()
-        done = self._check_if_done(state)
+        done, info = self._check_if_done(state)
         
-        # NaN protection: if any state value is NaN, return a zero state and mark as done (crash)
-        if np.isnan(state).any():
-            return np.zeros(7, dtype=np.float32)
-
-        return state, done
+        return state, done, info
     
     def _check_if_done(self, state):
         """
@@ -180,27 +176,48 @@ class FlightSimulator:
         - Touchdown (landing) detected by wheel contact
         - Exceeding limits (5000 ft from threshold or 2000 ft lateral deviation from the centerline)
         """
+        v_speed = state[1]
+        roll = state[4]
         dist = state[5]
         lat_err = state[6]
         
-        # If any state value is NaN - consider it a crash (done)
+        # State value is NaN - consider it a crash
         if not state.any(): 
-            return True
+            return True, {"status": "CRASH", "reason": "NaN value (physics error)"}
             
-        # Landing condition
+        nose_wheel_touch = self.fdm['gear/unit[0]/WOW']
         left_wheel_touch = self.fdm['gear/unit[1]/WOW']
         right_wheel_touch = self.fdm['gear/unit[2]/WOW']
         
-        if left_wheel_touch > 0 or right_wheel_touch > 0:
+        if nose_wheel_touch > 0 or left_wheel_touch > 0 or right_wheel_touch > 0:
             if not self.touchdown:
                 self.touchdown = True
                 print("TOUCHDOWN DETECTED")
-            return True
-        
-        # Finishing conditions
-        if dist > 5000 or abs(lat_err) > 2000:
-            return True
-        return False
+
+            if v_speed < -10.0:
+                return True, {"status": "CRASH", "reason": f"Hard Landing (V-Speed: {v_speed:.1f} fps)"}
+            
+            # Wing strike - roll angle too high at touchdown 
+            if abs(roll) > 0.26:
+                return True, {"status": "CRASH", "reason": "Wing Strike (Too much roll)"}
+                
+            # Out of runway landing - the plane is too far from the centerline at touchdown
+            if abs(lat_err) > self.rw_data["width"] / 2.0:
+                return True, {"status": "CRASH", "reason": "Landed off runway (Grass)"}
+            
+            # Short or long landing - the plane touched down too early or too late
+            if dist < -100.0 or dist > 8000.0:
+                 return True, {"status": "CRASH", "reason": "Landed short or overran runway"}
+
+            # Landing accepted - the plane touched down with acceptable parameters
+            return True, {"status": "LANDED", "reason": "Perfect Touchdown!"}
+            
+        # Out of bounds - the plane flew too far from the runway or is too high above it
+        if dist > 10000.0 or abs(lat_err) > 3000.0 or state[0] > 3000.0:
+            return True, {"status": "OUT_OF_BOUNDS", "reason": "Flew too far from approach path"}
+            
+        # Normal flying - the plane is still in the air and within acceptable parameters
+        return False, {"status": "FLYING", "reason": ""}
     
     def enable_flightgear(self, host='127.0.0.1', port=5550, rate=60):
         """
