@@ -27,6 +27,7 @@ cessna_172p_offset = 4.44  # Distance from the center of gravity to the main lan
 class FlightSimulator:
 
     """
+    :thows Raises an Error if created without runway data or initial conditions!!
     :param aircraft: plane model (default: Cessna 172)
     :param runway_data: Dictionary with runway information
         {
@@ -34,6 +35,7 @@ class FlightSimulator:
             "lon": float,      # longitude of runway threshold [deg]
             "heading": float,  # runway heading (True Heading) [deg]
             "elevation": float # runway elevation [ft]
+            "width": float     # runway width [ft]
         }
     :param initial_conditions: Dictionary with initial aircraft conditions (default: stable approach path)
         {

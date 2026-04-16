@@ -5,9 +5,11 @@ import time
 def test_flight_sim(action=[0.0, 0.0, 0.0], steps=50, Hz=10, enable_flightgear=False, default_runway=None):
     """
     Simple test function to validate the FlightSimulator API.
-    :param env: FlightSimulator instance
     :param action: Control input for the plane [aileron (-1.0 to 1.0), elevator (-1.0 to 1.0), throttle (-1.0 to 1.0)]
     :param steps: Number of simulation steps to run
+    :param Hz: Simulation delay (1 / Hz seconds per step) to simulate real-time
+    :param enable_flightgear: Whether to enable FlightGear visualization (optional)
+    :param default_runway: Preset runway to use for the simulation (e.g., "KSEA (Seattle) - Runway 34R")
     """
     print("--- API test for JSBSim ---")
     runway, ic = get_jsbsim_config(preset_runway=default_runway)
