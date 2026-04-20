@@ -51,7 +51,7 @@ class FlightSimulator:
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
         self.fdm.set_engine_path(os.path.join(self.jsbsim_path, 'engine'))
-        if aircraft is "c172p":
+        if aircraft == "c172p":
             self.cg_offset = cessna_172p_offset
         else:
             self.cg_offset = 0.0
@@ -185,7 +185,7 @@ class FlightSimulator:
         
         # State value is NaN - consider it a crash
         if not state.any(): 
-            return True, {"status": "CRASH", "reason": "NaN value (physics error)"}
+            return True, {"status": "ERROR", "reason": "NaN value (physics error)"}
             
         nose_wheel_touch = self.fdm['gear/unit[0]/WOW']
         left_wheel_touch = self.fdm['gear/unit[1]/WOW']
