@@ -3,22 +3,26 @@ from sim_env.jsbsim_wrapper import FlightSimulator
 import os
 import neat
 import pickle
+import random
 import datetime
 
-def run_evolution(learn_runway=None, generations=100):
+MAX_STEPS = 2500 # Maximum steps per try to prevent infinite loops
+HEIGHT_RAND_RANGE = 100  # Maximum randomization coeff for initial height (in feet)
+HEADNG_RAND_RANGE = 10  # Maximum randomization coeff for initial heading (in degrees)
+GLIDE_RAND_RANGE = 0.75  # Maximum randomization coeff for angle of glide slope (in degrees)
+DISTANCE_RAND_RANGE = 300  # Maximum randomization coeff for initial distance from threshold (in feet)
+
+def run_evolution(learn_runway=None, generations=100, randomize_level=0):
     """
     Runs the NEAT evolutionary algorithm to train a landing assistant for the specified runway.
     :param learn_runway: Preset runway to use for training, config panel opens if None.
     :param generations: Number of generations to run the evolution for.
+    :param randomize_level: Level of randomization for each generation.
     """
 
     runway, ic = config(preset_runway=learn_runway)
     if runway is None or ic is None:
         print("Configuration error: No runway or initial conditions provided.")
-        return
-    env = FlightSimulator(runway_data=runway, initial_conditions=ic)
-    if env is None:
-        print("jsbsim error: No environment")
         return
 
     print("--- Running Evolution ---")
@@ -44,7 +48,7 @@ def run_evolution(learn_runway=None, generations=100):
     print("| Neat initialization completed")
     print("| Running evolution...")
 
-    best_agent = population.run(lambda genomes, config: fitness(genomes, config, (runway, ic), env), n=generations)
+    best_agent = population.run(lambda genomes, config: fitness(genomes, config, (runway, ic), randomize_level), n=generations)
 
     print("\nBest genome:\n{!s}".format(best_agent))
     save_path = os.path.join(local_dir, "models", datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_best_agent.pkl")
@@ -54,21 +58,33 @@ def run_evolution(learn_runway=None, generations=100):
 
 
 
-def fitness(genomes, config, env_config, env):
+def fitness(genomes, config, env_config, randomize):
     """
     Fitness function that evaluates each genome by scoring the landing performance.
     :param genomes: List of genomes to evaluate.
     :param config: NEAT configuration object.
     :param env_config: Tuple containing runway and initial conditions.
-    :param env: FlightSimulator instance to use for evaluation.
     """
     runway, ic = env_config
+    if(randomize != 0):
+        if(randomize > 10):
+            randomize = 10
+        elif(randomize < 0):
+            randomize = 0
+        ic["h_agl"] += random.uniform(-HEIGHT_RAND_RANGE*randomize, HEIGHT_RAND_RANGE*randomize)
+        ic["heading"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
+        ic["glide_slope"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
+        ic["dist_ft"] += random.uniform(-DISTANCE_RAND_RANGE*randomize, DISTANCE_RAND_RANGE*randomize)
+    env = FlightSimulator(runway_data=runway, initial_conditions=ic)
+    if env is None:
+        print("jsbsim error: No environment")
+        return
     for genome_id, genome in genomes:
         genome.fitness = 0.0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         state = env.reset()
         done = False
-        max_steps = 2500
+        max_steps = MAX_STEPS
 
         while not done and max_steps > 0:
             action = net.activate(state)

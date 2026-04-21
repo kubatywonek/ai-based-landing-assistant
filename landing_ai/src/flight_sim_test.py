@@ -54,6 +54,7 @@ def debug_flight_state(state):
     4: Roll angle (rad)
     5: Distance to runway threshold (ft) - negative means we are before the threshold
     6: Lateral deviation from runway centerline (ft) - 0 means ideal centering
+    7: Heading error (rad) - error relative to runway heading, negative means to the left
     """
     print(f"------------- Flight State -------------")
     print(f"Height above runway: {state[0]:.2f} ft")
@@ -63,4 +64,5 @@ def debug_flight_state(state):
     print(f"Roll angle: {state[4]:.2f} rad   or   {state[4]*57.2957795:.2f} deg")
     print(f"Distance to threshold: {state[5]:.2f} ft")
     print(f"Lateral deviation: {state[6]:.2f} ft")
+    print(f"Heading error: {state[7]:.2f} rad   or   {state[7]*57.2957795:.2f} deg")
     print(f"----------------------------------------\n")

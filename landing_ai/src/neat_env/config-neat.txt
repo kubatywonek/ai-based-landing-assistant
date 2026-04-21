@@ -54,3 +54,9 @@ conn_add_prob = 0.5         #
 conn_delete_prob = 0.5      # topology change rate section
 node_add_prob = 0.2         # (adjust to preserve behavior!)
 node_delete_prob = 0.2      #
+
+feed_forward = True                 # do not allow recurrent connections
+initial_connection = full_direct    # connect to all other nodes
+num_inputs = 8                      #
+num_hidden = 0                      # initial layers
+num_outputs = 3                     #
