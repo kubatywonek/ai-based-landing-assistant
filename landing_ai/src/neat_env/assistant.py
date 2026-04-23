@@ -5,12 +5,14 @@ import neat
 import pickle
 import random
 import datetime
+import math
 
 MAX_STEPS = 2500 # Maximum steps per try to prevent infinite loops
 HEIGHT_RAND_RANGE = 100  # Maximum randomization coeff for initial height (in feet)
 HEADNG_RAND_RANGE = 10  # Maximum randomization coeff for initial heading (in degrees)
 GLIDE_RAND_RANGE = 0.75  # Maximum randomization coeff for angle of glide slope (in degrees)
 DISTANCE_RAND_RANGE = 300  # Maximum randomization coeff for initial distance from threshold (in feet)
+DISTANCE_COEFF = math.tan(math.radians(3))  # Coefficient for ideal altitude based on distance to threshold (3 degrees glide slope)
 
 def run_evolution(learn_runway=None, generations=100, randomize_level=0):
     """
@@ -48,7 +50,7 @@ def run_evolution(learn_runway=None, generations=100, randomize_level=0):
     print("| Neat initialization completed")
     print("| Running evolution...")
 
-    best_agent = population.run(lambda genomes, config: fitness(genomes, config, (runway, ic), randomize_level), n=generations)
+    best_agent = population.run(lambda genomes, config: evaluate(genomes, config, (runway, ic), randomize_level), n=generations)
 
     print("\nBest genome:\n{!s}".format(best_agent))
     save_path = os.path.join(local_dir, "models", datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_best_agent.pkl")
@@ -58,62 +60,90 @@ def run_evolution(learn_runway=None, generations=100, randomize_level=0):
 
 
 
-def fitness(genomes, config, env_config, randomize):
+def evaluate(genomes, config, env_config, randomize):
     """
-    Fitness function that evaluates each genome by scoring the landing performance.
+    Evaluating function that evaluates each genome by scoring the landing performance.
     :param genomes: List of genomes to evaluate.
     :param config: NEAT configuration object.
     :param env_config: Tuple containing runway and initial conditions.
     """
-    runway, ic = env_config
-    if(randomize != 0):
-        if(randomize > 10):
-            randomize = 10
-        elif(randomize < 0):
-            randomize = 0
-        ic["h_agl"] += random.uniform(-HEIGHT_RAND_RANGE*randomize, HEIGHT_RAND_RANGE*randomize)
-        ic["heading"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
-        ic["glide_slope"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
-        ic["dist_ft"] += random.uniform(-DISTANCE_RAND_RANGE*randomize, DISTANCE_RAND_RANGE*randomize)
-    env = FlightSimulator(runway_data=runway, initial_conditions=ic)
-    if env is None:
-        print("jsbsim error: No environment")
-        return
-    for genome_id, genome in genomes:
+    for genome in genomes:
+        
+        # Randomization
+        runway, ic = env_config
+        if(randomize != 0):
+            if(randomize > 10):
+                randomize = 10
+            elif(randomize < 0):
+                randomize = 0
+            ic["h_agl"] += random.uniform(-HEIGHT_RAND_RANGE*randomize, HEIGHT_RAND_RANGE*randomize)
+            ic["heading"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
+            ic["glide_slope"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
+            ic["dist_ft"] += random.uniform(-DISTANCE_RAND_RANGE*randomize, DISTANCE_RAND_RANGE*randomize)
+        env = FlightSimulator(runway_data=runway, initial_conditions=ic)
+        if env is None:
+            print("jsbsim error: No environment")
+            return
+
         genome.fitness = 0.0
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         state = env.reset()
         done = False
-        max_steps = MAX_STEPS
+        steps_left = MAX_STEPS
 
-        while not done and max_steps > 0:
+        while not done and steps_left > 0:
             action = net.activate(state)
             state, done, info = env.step(action)
             genome.fitness += calculate_fitness(state, done, info)
-            max_steps -= 1
+            steps_left -= 1
 
 
 
-def calculate_fitness(state, done, info):   #TODO fitness function
+def calculate_fitness(state, done, info):
     """
-    Custom fitness calculation function. NOTE: (fitness_treshold = 100 000)
+    Custom fitness calculation function. NOTE: fitness_treshold = 100 000
     :param state: Current state of the plane.
     :param done: Whether the episode is finished.
     :param info: Additional info from the environment.
     :return: Fitness score for the current step.
     """
     fitness = 0.0
+    alt = state[0]
+    v_speed = state[1]
+    h_speed = state[2]
+    pitch = math.degrees(state[3])
+    roll = state[4]
+    distance = state[5]
+    lat_error = state[6]
+    heading_error = state[7]
+
     if done: # Finished
         if info["status"] == "LANDED":
-            fitness = 0
+            fitness += 20000                                                     # Great reward for landing
+            fitness += max(0, 2000 - abs(lat_error) * 20)                        # Reward for being close to centerline
+            fitness += max(0, 2000 - abs(math.degrees(heading_error)) * 150)    # Reward for correct heading
+            fitness += max(0, 3000 - abs(v_speed + 3.0) * 300)                   # Reward for smooth vertical speed
+            if 0.0 < pitch < 7.0:
+                fitness += 1000                                                  # Bonus for proper flare at landing
+            elif pitch < 0.0:
+                fitness -= 2000                                                  # Penalty for nose-down landing
+
         elif info["status"] == "OUT_OF_BOUNDS":
-            fitness = 0
+            fitness -= 2000
         elif info["status"] == "CRASH":
-            fitness = 0
+            fitness -= 5000
         elif info["status"] == "ERROR":
-            fitness = 0
+            fitness -= 1000
         else:
             raise ValueError(f"Unknown status: {info['status']}")
     else: #Still flying
-        fitness += 0.1 # Small reward for surviving each step
+        fitness += 0.1                                          # Small reward for surviving each step
+        ideal_alt = max(0, -distance * DISTANCE_COEFF)          # Ideal altitude
+
+        fitness -= abs(alt - ideal_alt) / 500.0                 # Penalty for altitude deviation
+        fitness -= abs(lat_error) * 0.01                        # Penalty for lateral deviation
+        fitness -= abs(heading_error) * 10                      # Penalty for heading deviation
+        fitness -= abs(h_speed - 143.00) * 0.02                 # Penalty for horizontal speed deviation
+        fitness -= abs(roll) * 5.0                              # Penalty for roll angle
+
     return fitness
