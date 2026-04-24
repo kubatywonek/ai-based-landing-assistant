@@ -2,6 +2,7 @@ from sim_env.jsbsim_wrapper import FlightSimulator
 from sim_env.preflight_config import get_jsbsim_config
 import time
 import neat
+import os
 import pickle
 
 def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
@@ -15,9 +16,11 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
     print("--- Agent test flight ---")
 
     # --- AGENT SETUP ---
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'neat_config.txt')
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         'config-neat.txt')
+                         config_path)
                          
     with open(agent_path, 'rb') as f:
         agent_genome = pickle.load(f)

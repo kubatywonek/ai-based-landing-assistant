@@ -6,6 +6,7 @@ import pickle
 import random
 import datetime
 import math
+import glob
 
 MAX_STEPS = 2500 # Maximum steps per try to prevent infinite loops
 HEIGHT_RAND_RANGE = 100  # Maximum randomization coeff for initial height (in feet)
@@ -14,9 +15,11 @@ GLIDE_RAND_RANGE = 0.75  # Maximum randomization coeff for angle of glide slope 
 DISTANCE_RAND_RANGE = 300  # Maximum randomization coeff for initial distance from threshold (in feet)
 DISTANCE_COEFF = math.tan(math.radians(3))  # Coefficient for ideal altitude based on distance to threshold (3 degrees glide slope)
 
-def run_evolution(learn_runway=None, generations=100, randomize_level=0):
+def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=100, randomize_level=0):
     """
     Runs the NEAT evolutionary algorithm to train a landing assistant for the specified runway.
+    :param from_seed: Path to a seed genome file to initialize the population. If None, starts with a random population.
+    :param resume: If True, population will be restored from the latest checkpoint in the "neat-checkpoints" directory.
     :param learn_runway: Preset runway to use for training, config panel opens if None.
     :param generations: Number of generations to run the evolution for.
     :param randomize_level: Level of randomization for each generation.
@@ -40,17 +43,38 @@ def run_evolution(learn_runway=None, generations=100, randomize_level=0):
                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
                         config_path)
     os.makedirs("models", exist_ok=True)
-    population = neat.Population(config)
-    population.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    population.add_reporter(stats)
     os.makedirs("neat-checkpoints", exist_ok=True)
-    population.add_reporter(neat.Checkpointer(15, filename_prefix="neat-checkpoints/checkpoint-"))
+    if resume:
+        print("| Resuming population from latest checkpoint")
+        list_of_files = glob.glob(os.path.join(local_dir, 'neat-checkpoints', 'checkpoint-*'))
+        if not list_of_files:
+            print("| No checkpoints found, starting with a new population")
+            new_population = neat.Population(config)
+        else:
+            latest_checkpoint = max(list_of_files, key=os.path.getctime)
+            print(f"| Resuming population from: {latest_checkpoint}")
+            new_population = neat.Checkpointer.restore_checkpoint(latest_checkpoint)
+    elif from_seed is not None:
+        print("| Reinitializing population from seed")
+        new_population = neat.Population(config)
+        with open(from_seed, 'rb') as f:
+            champion_genome = pickle.load(f)
+        for genome_id, genome in new_population.population.items():
+            genome.nodes = champion_genome.nodes.copy()
+            genome.connections = champion_genome.connections.copy()
+            genome.mutate(config.genome_config)
+    else: 
+        new_population = neat.Population(config)
+
+    new_population.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    new_population.add_reporter(stats)
+    new_population.add_reporter(neat.Checkpointer(15, filename_prefix="neat-checkpoints/checkpoint-"))
 
     print("| Neat initialization completed")
     print("| Running evolution...")
 
-    best_agent = population.run(lambda genomes, config: evaluate(genomes, config, (runway, ic), randomize_level), n=generations)
+    best_agent = new_population.run(lambda genomes, config: evaluate(genomes, config, (runway, ic), randomize_level), n=generations)
 
     print("\nBest genome:\n{!s}".format(best_agent))
     save_path = os.path.join(local_dir, "models", datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_best_agent.pkl")
