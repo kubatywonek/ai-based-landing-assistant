@@ -4,6 +4,7 @@ import src.sim_env.telemetry as log
 import time
 import neat
 import os
+import math
 import pickle
 
 def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
@@ -56,8 +57,8 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
                 'alt': plane_state[0],
                 'aileron': action[0],
                 'elevator': action[1],
-                'pitch': plane_state[3],
-                'roll': plane_state[4]
+                'pitch': math.degrees(plane_state[3]),
+                'roll': math.degrees(plane_state[4])
             })
             plane_state, done, info = env.step(action)
             if i % 10 == 0:
