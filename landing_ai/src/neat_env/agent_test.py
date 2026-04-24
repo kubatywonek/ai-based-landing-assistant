@@ -1,5 +1,6 @@
 from sim_env.jsbsim_wrapper import FlightSimulator
 from sim_env.preflight_config import get_jsbsim_config
+import src.sim_env.telemetry as log
 import time
 import neat
 import os
@@ -37,6 +38,7 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
         return
     env = FlightSimulator(runway_data=runway, initial_conditions=ic)
     rate = 1.0 / Hz
+    logger = log.Telemetry()
     if env is None:
         print("No environment provided")
         return
@@ -49,6 +51,14 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
 
         for i in range(steps):
             action = net.activate(plane_state)
+            logger.log({
+                'step': i,
+                'alt': plane_state[0],
+                'aileron': action[0],
+                'elevator': action[1],
+                'pitch': plane_state[3],
+                'roll': plane_state[4]
+            })
             plane_state, done, info = env.step(action)
             if i % 10 == 0:
                 print(f"Step {i}\n")
@@ -58,7 +68,9 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
             if done:
                 print("Simulation finished. Status: ", info["status"], ". Reason: ", info["reason"])
                 break
-        
+        logger.save()
+        print("Flight data saved. Generating report...")
+        logger.plot()
     except Exception as e:
         print(f"✗ Error: {e}")
 
