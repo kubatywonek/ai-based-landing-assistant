@@ -1,10 +1,10 @@
-from sim_env.preflight_config import get_jsbsim_config as config
+from sim_env.preflight_config import get_jsbsim_config
 from sim_env.jsbsim_wrapper import FlightSimulator
 import os
 import neat
 import pickle
 import random
-import datetime
+from datetime import datetime
 import math
 import glob
 
@@ -25,7 +25,7 @@ def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=1
     :param randomize_level: Level of randomization for each generation.
     """
 
-    runway, ic = config(preset_runway=learn_runway)
+    runway, ic = get_jsbsim_config(preset_runway=learn_runway)
     if runway is None or ic is None:
         print("Configuration error: No runway or initial conditions provided.")
         return
@@ -38,11 +38,10 @@ def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=1
 
     # NEAT CONFIGURATION
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'neat_config.txt')
+    config_path = os.path.join(local_dir, 'config-neat.txt')
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
                         config_path)
-    os.makedirs("models", exist_ok=True)
     os.makedirs("neat-checkpoints", exist_ok=True)
     if resume:
         print("| Resuming population from latest checkpoint")
@@ -77,7 +76,9 @@ def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=1
     best_agent = new_population.run(lambda genomes, config: evaluate(genomes, config, (runway, ic), randomize_level), n=generations)
 
     print("\nBest genome:\n{!s}".format(best_agent))
-    save_path = os.path.join(local_dir, "models", datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_best_agent.pkl")
+    models_dir = os.path.join(local_dir, "models")
+    os.makedirs(models_dir, exist_ok=True)
+    save_path = os.path.join(models_dir, datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_best_agent.pkl")
     with open(save_path, "wb") as file:
         pickle.dump(best_agent, file)
     return
@@ -91,7 +92,7 @@ def evaluate(genomes, config, env_config, randomize):
     :param config: NEAT configuration object.
     :param env_config: Tuple containing runway and initial conditions.
     """
-    for genome in genomes:
+    for genome_id, genome in genomes:
         
         # Randomization
         runway, ic = env_config
@@ -120,6 +121,8 @@ def evaluate(genomes, config, env_config, randomize):
             state, done, info = env.step(action)
             genome.fitness += calculate_fitness(state, done, info)
             steps_left -= 1
+            if done:
+                print(f"Agent died after {MAX_STEPS - steps_left} steps. Reason: {info['reason']}")
 
 
 
@@ -170,4 +173,7 @@ def calculate_fitness(state, done, info):
         fitness -= abs(h_speed - 143.00) * 0.02                 # Penalty for horizontal speed deviation
         fitness -= abs(roll) * 5.0                              # Penalty for roll angle
 
+    if math.isnan(fitness) or math.isinf(fitness):
+            return -5000.0
+    
     return fitness

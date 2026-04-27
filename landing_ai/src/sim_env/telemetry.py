@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import os
-import datetime
+from datetime import datetime
 
 """
 Simple telemetry class to log and save flight data for analysis.
@@ -28,7 +28,7 @@ class Telemetry:
         local_path = os.path.dirname(__file__)
         directory = os.path.join(local_path, "telemetry_logs")
         os.makedirs(directory, exist_ok=True)
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         full_path = os.path.join(directory, f"telemetry_log-{timestamp}.csv")
         with open(full_path, 'w') as f:
             f.write("step,altitude,aileron,elevator,pitch,roll\n")

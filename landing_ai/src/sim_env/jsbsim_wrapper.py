@@ -29,24 +29,25 @@ class FlightSimulator:
     :param aircraft: plane model (default: Cessna 172)
     :param runway_data: Dictionary with runway information
         {
-            "lat": float,      # latitude of runway threshold [deg]
-            "lon": float,      # longitude of runway threshold [deg]
-            "heading": float,  # runway heading (True Heading) [deg]
-            "elevation": float # runway elevation [ft]
-            "width": float     # runway width [ft]
+            "lat": float,       # latitude of runway threshold [deg]
+            "lon": float,       # longitude of runway threshold [deg]
+            "heading": float,   # runway heading (True Heading) [deg]
+            "elevation": float, # runway elevation [ft]
+            "width": float      # runway width [ft]
         }
     :param initial_conditions: Dictionary with initial aircraft conditions (default: stable approach path)
         {
-            "h_agl": float,      # height above ground level [ft]
-            "vc_kts": float,     # velocity (IAS) [kts]
-            "dist_ft": float,    # distance from runway threshold [ft]
-            "gamma_deg": float,  # glide path angle [deg]
-            "psi_true_deg": float # initial heading [deg]
+            "h_agl": float,         # height above ground level [ft]
+            "vc_kts": float,        # velocity (IAS) [kts]
+            "dist_ft": float,       # distance from runway threshold [ft]
+            "gamma_deg": float,     # glide path angle [deg]
+            "psi_true_deg": float   # initial heading [deg]
         }
     """
     def __init__(self, aircraft="c172p", runway_data=None, initial_conditions=None):
         self.jsbsim_path = os.path.dirname(jsbsim.__file__)
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
+        self.fdm.set_debug_level(0) # 0 = no debug, 1 = warnings, 2 = info, 3 = debug
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
         self.fdm.set_engine_path(os.path.join(self.jsbsim_path, 'engine'))
         if aircraft == "c172p":
@@ -131,7 +132,7 @@ class FlightSimulator:
         Positive means the nose is pointing to the right of the runway heading, negative means left.
         """
 
-        plane_heading = self.fdm['attitude/psi-true-rad']
+        plane_heading = self.fdm['ic/psi-true-rad']
         runway_heading = math.radians(self.rw_data["heading"])
         heading_error = (plane_heading - runway_heading + math.pi) % (2 * math.pi) - math.pi
 
