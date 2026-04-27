@@ -156,9 +156,11 @@ def calculate_fitness(state, done, info):
                 fitness -= 2000                                                  # Penalty for nose-down landing
 
         elif info["status"] == "OUT_OF_BOUNDS":
-            fitness -= 2000
+            fitness -= 5000
+            fitness += max(0, 5000 - abs(distance))
         elif info["status"] == "CRASH":
             fitness -= 5000
+            fitness += max(0, 5000 - abs(distance))
         elif info["status"] == "ERROR":
             fitness -= 1000
         else:
