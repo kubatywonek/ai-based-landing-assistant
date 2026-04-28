@@ -166,14 +166,14 @@ def calculate_fitness(state, done, info):
         else:
             raise ValueError(f"Unknown status: {info['status']}")
     else: #Still flying
-        fitness += 0.1                                          # Small reward for surviving each step
+        fitness += 1.0                                          # Small reward for surviving each step
         ideal_alt = max(0, -distance * DISTANCE_COEFF)          # Ideal altitude
 
-        fitness -= abs(alt - ideal_alt) / 500.0                 # Penalty for altitude deviation
-        fitness -= abs(lat_error) * 0.01                        # Penalty for lateral deviation
-        fitness -= abs(heading_error) * 10                      # Penalty for heading deviation
-        fitness -= abs(h_speed - 143.00) * 0.02                 # Penalty for horizontal speed deviation
-        fitness -= abs(roll) * 5.0                              # Penalty for roll angle
+        fitness -= min(0.75, abs(alt - ideal_alt) / 1000.0)                 # Penalty for altitude deviation
+        fitness -= min(0.75, abs(lat_error) * 0.005)                        # Penalty for lateral deviation
+        fitness -= min(0.75, abs(heading_error) * 5.0)                      # Penalty for heading deviation
+        fitness -= min(0.75, abs(h_speed - 143.00) * 0.01)                  # Penalty for horizontal speed deviation
+        fitness -= min(0.75, abs(roll) * 1.0)                               # Penalty for roll angle
 
     if math.isnan(fitness) or math.isinf(fitness):
             return -5000.0

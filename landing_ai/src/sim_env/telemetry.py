@@ -56,8 +56,8 @@ class Telemetry:
         axs[1].grid(True)
 
         # Orientation plot
-        axs[2].plot(self.step, self.pitch, color='purple', label='Pochylenie (Pitch)', linewidth=1.5)
-        axs[2].plot(self.step, self.roll, color='orange', label='Przechylenie (Roll)', linewidth=1.5)
+        axs[2].plot(self.step, self.pitch, color='purple', label='Pitch', linewidth=1.5)
+        axs[2].plot(self.step, self.roll, color='orange', label='Roll', linewidth=1.5)
         axs[2].set_ylabel("Angle [degrees]")
         axs[2].set_xlabel("Flight time [steps]")
         axs[2].set_title("Aircraft orientation")

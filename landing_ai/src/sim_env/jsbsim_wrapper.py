@@ -247,7 +247,7 @@ class FlightSimulator:
         <output name="{host}" type="FLIGHTGEAR" port="{port}" protocol="UDP" rate="{rate}">
         </output>
         """
-        abs_path = os.path.abspath("fg_conf/fg_out.xml")
+        abs_path = os.path.abspath("../../fg_conf/fg_out.xml")
 
         with open(abs_path, "w") as f:
             f.write(output_xml)

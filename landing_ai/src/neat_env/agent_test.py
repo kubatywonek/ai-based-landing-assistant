@@ -1,13 +1,13 @@
 from sim_env.jsbsim_wrapper import FlightSimulator
 from sim_env.preflight_config import get_jsbsim_config
-import src.sim_env.telemetry as log
+import sim_env.telemetry as log
 import time
 import neat
 import os
 import math
 import pickle
 
-def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
+def test_agent(agent_path, steps=5000, Hz=15, enable_flightgear=False):
     """
     Simple test function to validate the FlightSimulator API.
     :param agent_path: Path to the trained agent file
@@ -19,7 +19,7 @@ def test_agent(agent_path, steps=1000, Hz=10, enable_flightgear=False):
 
     # --- AGENT SETUP ---
     local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'neat_config.txt')
+    config_path = os.path.join(local_dir, 'config-neat.txt')
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_path)
