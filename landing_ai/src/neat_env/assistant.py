@@ -175,6 +175,15 @@ def calculate_fitness(state, done, info):
         fitness -= min(0.75, abs(h_speed - 143.00) * 0.01)                  # Penalty for horizontal speed deviation
         fitness -= min(0.75, abs(roll) * 1.0)                               # Penalty for roll angle
 
+        if abs(heading_error) > math.radians(30):
+            fitness -= 5.0                         # Anti-farming penalty for large heading errors
+        if distance > 300:
+            fitness -= 5.0                         # Anti-farming penalty for being too far from the runway
+        if abs(roll) > 1.0:
+            fitness -= 10.0                        # Anti-farming penalty for excessive roll
+        if alt > ideal_alt + 1000:
+            fitness -= 10.0                        # Anti-farming penalty for being too high above the glide path
+
     if math.isnan(fitness) or math.isinf(fitness):
             return -5000.0
     

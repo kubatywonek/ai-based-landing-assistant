@@ -7,7 +7,7 @@ import os
 import math
 import pickle
 
-def test_agent(agent_path, steps=5000, Hz=15, enable_flightgear=False):
+def test_agent(agent_path, steps=10000, Hz=5, enable_flightgear=False):
     """
     Simple test function to validate the FlightSimulator API.
     :param agent_path: Path to the trained agent file
