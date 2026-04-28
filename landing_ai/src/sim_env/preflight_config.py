@@ -29,6 +29,7 @@ PRESET_CONDITIONS = {
 def get_jsbsim_config(preset_runway=None):
     """
     Displays a GUI for the user to input runway parameters and initial conditions for the flight simulation.
+    :param preset_runway: If provided, returns the preset configuration. If None, manual input is required.
     Returns:
     - runway_data: dict with keys 'lat', 'lon', 'heading', 'elevation', 'width'
     - initial_conditions: dict with keys 'h_agl', 'vc_kts', 'dist_ft', 'gamma_deg', 'psi_true_deg'

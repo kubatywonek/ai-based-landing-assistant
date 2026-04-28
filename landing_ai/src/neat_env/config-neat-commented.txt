@@ -1,0 +1,72 @@
+[NEAT]
+fitness_criterion = max         # max fitness is the goal
+fitness_threshold = 100000       # 100'000 fitness for evolution stop
+pop_size = 50                   # 50 individuals each generation
+reset_on_extinction = False     # don't create random gen if extinct
+seed = None                     # no seed for reproducible evolution
+
+[DefaultStagnation]
+species_fitness_func = max      # max function for fitness evaluation
+max_stagnation = 25             # 15 generations of no improvement
+species_elitism = 3             # save 3 individuals from extinction
+
+[DefaultReproduction]
+elitism = 3                             # take 3 elites as-it between generations
+survival_threshold = 0.2                 # default 20% of species allowed to reprod
+min_species_size = 3                    # minimum 3 species adfter DefaultReproduction
+
+[DefaultSpeciesSet]
+compatibility_threshold = 3.0    # min 3 genomic distance to be in diff species
+
+[DefaultGenome]
+activation_default = tanh               # tanh returns between [-1,1] - perfect for inputs
+activation_mutate_rate = 0.01           # 0.01 chance that function will be replaced (0.0 to preserve behavior!)
+activation_options = tanh sin clamped   # functions available to use (tanh to preserve behavior!)
+
+aggregation_default = sum               # sum as default aggregation function
+aggregation_mutate_rate = 0.01          # 0.01 chance that function will be replaced (0.0 to preserve behavior!)
+aggregation_options = sum product mean  # functions available to use (sum to preserve behavior!)
+
+bias_init_mean = 0.0
+bias_init_stdev = 1.0
+bias_max_value = 30.0
+bias_min_value = -30.0
+bias_mutate_power = 0.5     # 
+bias_mutate_rate = 0.7      # (adjust to preserve behavior!)
+bias_replace_rate = 0.15    #
+
+weight_init_mean = 0.0
+weight_init_stdev = 1.0
+weight_max_value = 35.0
+weight_min_value = -35.0
+weight_mutate_power = 0.5   #
+weight_mutate_rate = 0.8    # (adjust to preserve behavior!)
+weight_replace_rate = 0.1   #
+
+response_init_mean = 1.0
+response_init_stdev = 0.0
+response_max_value = 30.0
+response_min_value = -30.0
+response_mutate_power = 0.0 #
+response_mutate_rate = 0.0  # (adjust to preserve behavior!)
+response_replace_rate = 0.0 #
+
+compatibility_disjoint_coefficient = 1.0
+compatibility_weight_coefficient = 0.5
+compatibility_enable_penalty = 0.0          # penalty for distance of connections (1.0 to preserve behavior!)
+
+conn_add_prob = 0.5         #
+conn_delete_prob = 0.5      # topology change rate section
+node_add_prob = 0.2         # (adjust to preserve behavior!)
+node_delete_prob = 0.2      #
+
+feed_forward = True                 # do not allow recurrent connections
+initial_connection = full_direct    # connect to all other nodes
+num_inputs = 8                      #
+num_hidden = 0                      # initial layers
+num_outputs = 3                     #
+
+enabled_default = True              # default attribute of new connections
+enabled_mutate_rate = 0.01          # mutation of the default attribute
+enabled_rate_to_false_add = 0.0
+enabled_rate_to_true_add = 0.0

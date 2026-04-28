@@ -20,9 +20,7 @@ blank		f104			L17			    SGS			    x24b
 Boeing314	f15			    L410			sgs126			XB-70
 C130		f16			    MD11			sgs233			ZLT-NT
 """
-
-lattitude_to_ft_coef = 364173.0  # Approximate conversion factor from degrees of latitude to feet (varies with latitude)
-cessna_172p_offset = 4.44  # Distance from the center of gravity to the main landing gear (in feet) for the Cessna 172P, used for touchdown detection
+LATTITUDE_TO_FT_COEF = 364173.0  # Approximate conversion factor from degrees of latitude to feet (varies with latitude)
 
 class FlightSimulator:
 
@@ -31,28 +29,30 @@ class FlightSimulator:
     :param aircraft: plane model (default: Cessna 172)
     :param runway_data: Dictionary with runway information
         {
-            "lat": float,      # latitude of runway threshold [deg]
-            "lon": float,      # longitude of runway threshold [deg]
-            "heading": float,  # runway heading (True Heading) [deg]
-            "elevation": float # runway elevation [ft]
-            "width": float     # runway width [ft]
+            "lat": float,       # latitude of runway threshold [deg]
+            "lon": float,       # longitude of runway threshold [deg]
+            "heading": float,   # runway heading (True Heading) [deg]
+            "elevation": float, # runway elevation [ft]
+            "width": float      # runway width [ft]
         }
     :param initial_conditions: Dictionary with initial aircraft conditions (default: stable approach path)
         {
-            "h_agl": float,      # height above ground level [ft]
-            "vc_kts": float,     # velocity (IAS) [kts]
-            "dist_ft": float,    # distance from runway threshold [ft]
-            "gamma_deg": float,  # glide path angle [deg]
-            "psi_true_deg": float # initial heading [deg]
+            "h_agl": float,         # height above ground level [ft]
+            "vc_kts": float,        # velocity (IAS) [kts]
+            "dist_ft": float,       # distance from runway threshold [ft]
+            "gamma_deg": float,     # glide path angle [deg]
+            "psi_true_deg": float   # initial heading [deg]
         }
     """
     def __init__(self, aircraft="c172p", runway_data=None, initial_conditions=None):
         self.jsbsim_path = os.path.dirname(jsbsim.__file__)
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
+        self.fdm.set_debug_level(0) # 0 = no debug, 1 = warnings, 2 = info, 3 = debug
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
         self.fdm.set_engine_path(os.path.join(self.jsbsim_path, 'engine'))
-        if aircraft is "c172p":
-            self.cg_offset = cessna_172p_offset
+        if aircraft == "c172p":
+            # Distance from the center of gravity to the main landing gear (in feet), used for touchdown detection
+            self.cg_offset = 4.44
         else:
             self.cg_offset = 0.0
         
@@ -82,8 +82,8 @@ class FlightSimulator:
 
         # Starting position calculated based on runway data and desired starting distance
         rw_rad = math.radians(self.rw_data["heading"])
-        lat_offset = (dist_start_ft * math.cos(rw_rad)) / lattitude_to_ft_coef
-        lon_offset = (dist_start_ft * math.sin(rw_rad)) / (lattitude_to_ft_coef * math.cos(math.radians(self.rw_data["lat"])))
+        lat_offset = (dist_start_ft * math.cos(rw_rad)) / LATTITUDE_TO_FT_COEF
+        lon_offset = (dist_start_ft * math.sin(rw_rad)) / (LATTITUDE_TO_FT_COEF * math.cos(math.radians(self.rw_data["lat"])))
         
         self.fdm['ic/lat-geod-deg'] = self.rw_data["lat"] - lat_offset                # Starting latitude
         self.fdm['ic/long-gc-deg'] = self.rw_data["lon"] - lon_offset                 # Starting longitude
@@ -113,8 +113,8 @@ class FlightSimulator:
         ac_lon = self.fdm['position/long-gc-deg']
         
         # Conversion of degrees to feet
-        d_lat = (ac_lat - self.rw_data["lat"]) * lattitude_to_ft_coef
-        d_lon = (ac_lon - self.rw_data["lon"]) * lattitude_to_ft_coef * math.cos(math.radians(self.rw_data["lat"]))
+        d_lat = (ac_lat - self.rw_data["lat"]) * LATTITUDE_TO_FT_COEF
+        d_lon = (ac_lon - self.rw_data["lon"]) * LATTITUDE_TO_FT_COEF * math.cos(math.radians(self.rw_data["lat"]))
         
         # Runway heading in radians
         rw_rad = math.radians(self.rw_data["heading"])
@@ -126,10 +126,22 @@ class FlightSimulator:
         
         return long_dist, lat_error
 
+    def get_heading_error(self):
+        """
+        Calculates the heading error relative to the runway heading. Normalizes value between [-pi, pi].
+        Positive means the nose is pointing to the right of the runway heading, negative means left.
+        """
+
+        plane_heading = self.fdm['ic/psi-true-rad']
+        runway_heading = math.radians(self.rw_data["heading"])
+        heading_error = (plane_heading - runway_heading + math.pi) % (2 * math.pi) - math.pi
+
+        return heading_error
+
     def get_state(self):
         """
         Returns the current state of the aircraft.
-        Input Vector (7-dimensional):
+        Input Vector (8-dimensional):
         0: Height above the runway (ft)
         1: Vertical speed (ft/s) - positive means climbing, negative means descending
         2: Horizontal speed (ft/s)
@@ -137,8 +149,10 @@ class FlightSimulator:
         4: Roll angle (rad) - positive means right wing down, negative means left wing down
         5: Distance to runway threshold (ft) - negative means we are before the threshold
         6: Lateral deviation from runway centerline (ft) - negative means to the left, positive to the right
+        7: Heading error (rad) - error relative to runway heading, negative means to the left and positive means to the right
         """
         long_dist, lat_error = self.get_runway_relative_pos()
+        heading_error = self.get_heading_error()
         
         state = [
             self.fdm['position/h-agl-ft'] - self.cg_offset,           # Height above runway - center of gravity offset
@@ -147,7 +161,8 @@ class FlightSimulator:
             self.fdm['attitude/pitch-rad'],                           # Pitch
             self.fdm['attitude/roll-rad'],                            # Roll
             long_dist,                                                # Dist to threshold
-            lat_error                                                 # Lateral deviation
+            lat_error,                                                # Lateral deviation
+            heading_error                                             # Heading error
         ]
         return np.array(state, dtype=np.float32)
 
@@ -185,7 +200,7 @@ class FlightSimulator:
         
         # State value is NaN - consider it a crash
         if not state.any(): 
-            return True, {"status": "CRASH", "reason": "NaN value (physics error)"}
+            return True, {"status": "ERROR", "reason": "NaN value (physics error)"}
             
         nose_wheel_touch = self.fdm['gear/unit[0]/WOW']
         left_wheel_touch = self.fdm['gear/unit[1]/WOW']
@@ -232,7 +247,7 @@ class FlightSimulator:
         <output name="{host}" type="FLIGHTGEAR" port="{port}" protocol="UDP" rate="{rate}">
         </output>
         """
-        abs_path = os.path.abspath("fg_conf/fg_out.xml")
+        abs_path = os.path.abspath("../../fg_conf/fg_out.xml")
 
         with open(abs_path, "w") as f:
             f.write(output_xml)

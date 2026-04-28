@@ -14,3 +14,4 @@ miniconda3/
 build/
 dist/
 *.egg-info/
+neat-checkpoints/
