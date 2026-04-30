@@ -57,6 +57,7 @@ def test_agent(agent_path, steps=10000, Hz=5, enable_flightgear=False):
                 'alt': plane_state[0],
                 'aileron': action[0],
                 'elevator': action[1],
+                'throttle': action[2],
                 'pitch': math.degrees(plane_state[3]),
                 'roll': math.degrees(plane_state[4])
             })

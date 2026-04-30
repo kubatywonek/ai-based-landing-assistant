@@ -19,11 +19,9 @@ PRESET_RUNWAYS = {
 }
 
 PRESET_CONDITIONS = {
-    #"height": 1500.0, # [ft]
-    "height": 1000.0, # [ft]
-    "velocity": 85.0, # [kts]
-    #"distance": 18228.0, # [ft]
-    "distance": 5000.0, # [ft]
+    "height": 524.0, # [ft]
+    "velocity": 80.0, # [kts]
+    "distance": 10000.0, # [ft]
     "glide": -3.0, # [deg]
     "heading": 0.0 # [deg]
 }
