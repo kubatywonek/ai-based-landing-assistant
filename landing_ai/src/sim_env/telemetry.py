@@ -13,6 +13,7 @@ class Telemetry:
         self.alt = []
         self.aileron = []
         self.elevator = []
+        self.throttle = []
         self.pitch = []
         self.roll = []
     
@@ -21,6 +22,7 @@ class Telemetry:
         self.alt.append(entry.get('alt', 0))
         self.aileron.append(entry.get('aileron', 0))
         self.elevator.append(entry.get('elevator', 0))
+        self.throttle.append(entry.get('throttle', 0))
         self.pitch.append(entry.get('pitch', 0))
         self.roll.append(entry.get('roll', 0))
     
@@ -31,9 +33,9 @@ class Telemetry:
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         full_path = os.path.join(directory, f"telemetry_log-{timestamp}.csv")
         with open(full_path, 'w') as f:
-            f.write("step,altitude,aileron,elevator,pitch,roll\n")
+            f.write("step,altitude,aileron,elevator,throttle,pitch,roll\n")
             for i in range(len(self.step)):
-                f.write(f"{self.step[i]},{self.alt[i]},{self.aileron[i]},{self.elevator[i]},{self.pitch[i]},{self.roll[i]}\n")
+                f.write(f"{self.step[i]},{self.alt[i]},{self.aileron[i]},{self.elevator[i]},{self.throttle[i]},{self.pitch[i]},{self.roll[i]}\n")
     
     def plot(self):
         fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
@@ -49,6 +51,7 @@ class Telemetry:
         # Control surfaces plot
         axs[1].plot(self.step, self.aileron, color='green', label='Aileron', alpha=0.8)
         axs[1].plot(self.step, self.elevator, color='red', label='Elevator', alpha=0.8)
+        axs[1].plot(self.step, self.throttle, color='black', label='Throttle', alpha=0.8)
         axs[1].set_ylabel("Deflection [-1.0, 1.0]")
         axs[1].set_xlabel("Flight time [steps]")
         axs[1].set_title("Control surface activity")
