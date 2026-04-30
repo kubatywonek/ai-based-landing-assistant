@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Running FlightGear with cessna 172p, rate 60, listening on localhost:5550..."
+echo "Running FlightGear with cessna 172p (c172x), rate 60, listening on localhost:5550..."
 
 /Applications/FlightGear.app/Contents/MacOS/FlightGear \
   --fdm=null \

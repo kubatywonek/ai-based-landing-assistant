@@ -21,6 +21,7 @@ Boeing314	f15			    L410			sgs126			XB-70
 C130		f16			    MD11			sgs233			ZLT-NT
 """
 LATTITUDE_TO_FT_COEF = 364173.0  # Approximate conversion factor from degrees of latitude to feet (varies with latitude)
+SMOOTHING_FACTOR = 0.2  # Coefficient for smoothing steering changes to prevent excessive control inputs
 
 class FlightSimulator:
 
@@ -44,17 +45,14 @@ class FlightSimulator:
             "psi_true_deg": float   # initial heading [deg]
         }
     """
-    def __init__(self, aircraft="c172p", runway_data=None, initial_conditions=None):
+    def __init__(self, aircraft="c172x", runway_data=None, initial_conditions=None):
         self.jsbsim_path = os.path.dirname(jsbsim.__file__)
         self.fdm = jsbsim.FGFDMExec(self.jsbsim_path)
         self.fdm.set_debug_level(0) # 0 = no debug, 1 = warnings, 2 = info, 3 = debug
         self.fdm.set_aircraft_path(os.path.join(self.jsbsim_path, 'aircraft'))
         self.fdm.set_engine_path(os.path.join(self.jsbsim_path, 'engine'))
-        if aircraft == "c172p":
-            # Distance from the center of gravity to the main landing gear (in feet), used for touchdown detection
-            self.cg_offset = 4.44
-        else:
-            self.cg_offset = 0.0
+        self.cg_offset = 4.44 if aircraft == "c172x" else 0.0
+        # Distance from the center of gravity to the main landing gear (in feet), used for touchdown detection
         
         if not self.fdm.load_model(aircraft):
             raise RuntimeError(f"Could not load model: {aircraft}")
@@ -77,8 +75,11 @@ class FlightSimulator:
         self.fdm['ic/h-sl-ft'] = self.rw_data["elevation"] + self.init_data["h_agl"]  # Starting height above the runway
         self.fdm['ic/vc-kts'] = self.init_data["vc_kts"]                              # Speed
         self.fdm['ic/gamma-deg'] = self.init_data["gamma_deg"]                        # Descent angle
-        self.fdm['ic/psi-true-deg'] = self.rw_data["heading"]                         # Nose heading
+        self.fdm['ic/psi-true-deg'] = self.init_data["psi_true_deg"]                  # Nose heading
         dist_start_ft = self.init_data["dist_ft"]                                     # Distance from runway threshold
+
+        self.steer = [0.0, 0.0, -1.0]   # Aileron, Elevator, Throttle
+        self.touchdown = False
 
         # Starting position calculated based on runway data and desired starting distance
         rw_rad = math.radians(self.rw_data["heading"])
@@ -87,20 +88,57 @@ class FlightSimulator:
         
         self.fdm['ic/lat-geod-deg'] = self.rw_data["lat"] - lat_offset                # Starting latitude
         self.fdm['ic/long-gc-deg'] = self.rw_data["lon"] - lon_offset                 # Starting longitude
-        
+
+        # Refuel and start engine
+        self.fdm["propulsion/tank[0]/contents-lbs"] = 100.0
+        self.fdm["propulsion/tank[0]/priority"]     = 1
+        self.fdm["propulsion/tank[1]/contents-lbs"] = 100.0
+        self.fdm["propulsion/tank[1]/priority"]     = 1
+
         # Simulation initialization (run initial conditions)
         self.fdm.run_ic()
+
+        # Mixture and throttle settling
+        try:
+            self.fdm["fcs/mixture-cmd-norm"]   = 1.0  # full rich
+            self.fdm["propulsion/magneto_cmd"]  = 3    # both magnetos
+            self.fdm["fcs/throttle-cmd-norm"]   = 0.2  # slight throttle to help catch
+        except Exception as e:
+            print(f"[WARN] Pre-start setup: {e}")
         
+        # Stabilization of fuel system
+        for _ in range(20):
+            self.fdm.run()
+
         # Engine startup
-        self.fdm['propulsion/engine[0]/set-running'] = 1
-        self.fdm['fcs/throttle-cmd-norm'] = 0.5  # Half throttle as default
-        self.fdm['fcs/mixture-cmd-norm'] = 1.0   # Rich mixture (required for c172)
+        try:
+            self.fdm["propulsion/set-running"] = -1
+        except Exception as e:
+            print(f"[WARN] propulsion/set-running failed: {e}")
+            try:
+                self.fdm["propulsion/engine[0]/set-running"] = 1  # indexed fallback
+            except Exception as e2:
+                print(f"[WARN] engine[0]/set-running also failed: {e2}")
         
         # Stabilization of physics (performing a few "empty" steps to remove sudden force jumps)
-        for _ in range(10):
+        for _ in range(120):
             self.fdm.run()
+
+        try:
+            thrust = self.fdm["propulsion/engine[0]/thrust-lbs"]
+            if thrust < 0:
+                for _ in range(120):
+                    self.fdm.run()
+                thrust = self.fdm["propulsion/engine[0]/thrust-lbs"]
+            print(f"[INFO] Engine thrust after warmup: {thrust:.1f} lbs")
+        except Exception:
+            pass
+
+        # Initial control inputs
+        self.fdm['fcs/aileron-cmd-norm'] = float(self.steer[0])
+        self.fdm['fcs/elevator-cmd-norm'] = float(self.steer[1])
+        self.fdm['fcs/throttle-cmd-norm'] = (float(self.steer[2]) + 1.0) / 2.0
             
-        self.touchdown = False
         return self.get_state()
 
     def get_runway_relative_pos(self):
@@ -132,7 +170,7 @@ class FlightSimulator:
         Positive means the nose is pointing to the right of the runway heading, negative means left.
         """
 
-        plane_heading = self.fdm['ic/psi-true-rad']
+        plane_heading = self.fdm['attitude/heading-true-rad']
         runway_heading = math.radians(self.rw_data["heading"])
         heading_error = (plane_heading - runway_heading + math.pi) % (2 * math.pi) - math.pi
 
@@ -174,9 +212,12 @@ class FlightSimulator:
         Elevator: -1 (full down - nose up) to 1 (full up - nose down)
         Throttle: -1 (idle) to 1 (full throttle)
         """
-        self.fdm['fcs/aileron-cmd-norm'] = float(actions[0])
-        self.fdm['fcs/elevator-cmd-norm'] = float(actions[1])
-        self.fdm['fcs/throttle-cmd-norm'] = (float(actions[2]) + 1.0) / 2.0
+        for i in range(len(actions)):
+                self.steer[i] = max(-1.0, min(1.0, self.steer[i] * (1.0 - SMOOTHING_FACTOR) + actions[i] * SMOOTHING_FACTOR)) # Smoothing
+            
+        self.fdm['fcs/aileron-cmd-norm'] = float(self.steer[0])
+        self.fdm['fcs/elevator-cmd-norm'] = float(self.steer[1])
+        self.fdm['fcs/throttle-cmd-norm'] = (float(self.steer[2]) + 1.0) / 2.0
         
         # 5 steps to let the physics react to the control inputs
         for _ in range(5):
@@ -232,6 +273,10 @@ class FlightSimulator:
         # Out of bounds - the plane flew too far from the runway or is too high above it
         if dist > 10000.0 or abs(lat_err) > 3000.0 or state[0] > 3000.0:
             return True, {"status": "OUT_OF_BOUNDS", "reason": "Flew too far from approach path"}
+        
+        for val in state:
+            if math.isnan(val) or math.isinf(val):
+                return True, {"status": "ERROR", "reason": "Physics Engine Broke (NaN/Inf)"}
             
         # Normal flying - the plane is still in the air and within acceptable parameters
         return False, {"status": "FLYING", "reason": ""}
