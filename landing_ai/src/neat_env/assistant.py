@@ -178,6 +178,7 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             raise ValueError(f"Unknown status: {info['status']}")
     else: #Still flying
         fitness += max(0.0, (dist_ft - abs(distance)) / dist_ft) * 3            # Small reward for surviving towards the runway
+        fitness += max(0.0, 50 - abs(lat_error)) * 0.04                         # Small reward for being close to centerline
         fitness -= 0.05 * (MAX_STEPS - steps_left) / MAX_STEPS                  # Small penalty for taking more time to land
         fitness += 1.0
         
@@ -201,8 +202,8 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
         delta_aileron = abs(action[0] - prev_action[0])
         delta_elevator = abs(action[1] - prev_action[1])
         
-        fitness -= min(0.3, (delta_aileron ** 2) * 1.0)
-        fitness -= min(0.3, (delta_elevator ** 2) * 0.3)
+        fitness -= (delta_aileron ** 2) * 2.0
+        fitness -= (delta_elevator ** 2) * 2.0
 
         if abs(heading_error) > math.radians(30):
             fitness -= 5.0                         # Anti-farming penalty for large heading errors
@@ -214,8 +215,8 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             fitness -= 10.0                        # Anti-farming penalty for excessive pitch
         if alt > ideal_alt + 1000:
             fitness -= 10.0                        # Anti-farming penalty for being too high above the glide path
-        if v_speed < -40.0:
-            fitness -= 50.0                        # Anti-farming penalty for rapid descent
+        if v_speed < -30.0:
+            fitness -= 70.0                        # Anti-farming penalty for rapid descent
         
 
     if math.isnan(fitness) or math.isinf(fitness):
