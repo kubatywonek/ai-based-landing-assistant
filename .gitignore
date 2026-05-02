@@ -15,3 +15,11 @@ build/
 dist/
 *.egg-info/
 neat-checkpoints/
+
+# --- MODELS ---
+**/models/*
+!**/models/v*
+
+# --- TELEMETRY ---
+**/telemetry_logs/*
+!**/telemetry_logs/v*
