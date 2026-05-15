@@ -8,6 +8,7 @@ import random
 from datetime import datetime
 import math
 import glob
+import copy
 
 MAX_STEPS = 4000 # Maximum steps per try to prevent infinite loops
 HEIGHT_RAND_RANGE = 100  # Maximum randomization coeff for initial height (in feet)
@@ -60,8 +61,8 @@ def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=1
         with open(from_seed, 'rb') as f:
             champion_genome = pickle.load(f)
         for genome_id, genome in new_population.population.items():
-            genome.nodes = champion_genome.nodes.copy()
-            genome.connections = champion_genome.connections.copy()
+            genome.nodes = copy.deepcopy(champion_genome.nodes)
+            genome.connections = copy.deepcopy(champion_genome.connections)
             genome.mutate(config.genome_config)
     else: 
         new_population = neat.Population(config)
@@ -171,13 +172,13 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             fitness += max(0, dist_ft - abs(distance))
         elif info["status"] == "CRASH":
             fitness -= 10000 * steps_left / MAX_STEPS
-            fitness += max(0, dist_ft - abs(distance))
+            #fitness += max(0, dist_ft - abs(distance))
         elif info["status"] == "ERROR":
             fitness -= 1000
         else:
             raise ValueError(f"Unknown status: {info['status']}")
     else: #Still flying
-        fitness += max(0.0, (dist_ft - abs(distance)) / dist_ft) * 3            # Small reward for surviving towards the runway
+        fitness += max(0.0, (dist_ft - abs(distance)) / dist_ft) * 0.5            # Small reward for surviving towards the runway
         fitness += max(0.0, 50 - abs(lat_error)) * 0.04                         # Small reward for being close to centerline
         fitness -= 0.05 * (MAX_STEPS - steps_left) / MAX_STEPS                  # Small penalty for taking more time to land
         fitness += 1.0
@@ -188,11 +189,11 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             ideal_vspeed = -1.5
         
         fitness -= math.sqrt(abs(v_speed - ideal_vspeed)) * 0.5                  # Penalty for vertical speed deviation from ideal glide slope descent rate
-        fitness -= min(0.15, abs(alt - ideal_alt) / 1000.0)                     # Penalty for altitude deviation
-        fitness -= min(0.50, abs(lat_error) * 0.05)                                        # Penalty for lateral deviation
+        fitness -= min(0.15, abs(alt - ideal_alt) / 200.0)                     # Penalty for altitude deviation
+        fitness -= min(0.50, abs(lat_error) * 0.5)                                        # Penalty for lateral deviation
         fitness -= min(0.25, abs(heading_error) * 3.0)                                     # Penalty for heading deviation
         fitness -= min(0.15, abs(h_speed - 140.00) * 0.006)                                 # Penalty for horizontal speed deviation
-        fitness -= min(0.15, abs(roll) * 0.02)                                             # Penalty for roll angle
+        fitness -= min(0.15, abs(roll) * 0.5)                                             # Penalty for roll angle
         fitness -= min(0.15, abs(pitch) * 0.01)                                            # Penalty for pitch angle
         fitness -= min(0.30, (abs(action[0])**2 + abs(action[1])**2) * 0.3)      # Penalty for excessive control inputs                                                 
 
@@ -202,8 +203,8 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
         delta_aileron = abs(action[0] - prev_action[0])
         delta_elevator = abs(action[1] - prev_action[1])
         
-        fitness -= (delta_aileron ** 2) * 2.0
-        fitness -= (delta_elevator ** 2) * 2.0
+        fitness -= (delta_aileron ** 2) * 15.0
+        fitness -= (delta_elevator ** 2) * 15.0
 
         if abs(heading_error) > math.radians(30):
             fitness -= 5.0                         # Anti-farming penalty for large heading errors
@@ -213,8 +214,7 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             fitness -= 10.0                        # Anti-farming penalty for excessive roll
         if abs(pitch) > 15.0:
             fitness -= 10.0                        # Anti-farming penalty for excessive pitch
-        if alt > ideal_alt + 1000:
-            fitness -= 10.0                        # Anti-farming penalty for being too high above the glide path
+        fitness -= abs(alt - ideal_alt) * 0.01     # Anti-farming penalty for being too high above the glide path
         if v_speed < -30.0:
             fitness -= 70.0                        # Anti-farming penalty for rapid descent
         
