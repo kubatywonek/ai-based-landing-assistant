@@ -281,7 +281,7 @@ class FlightSimulator:
         # Normal flying - the plane is still in the air and within acceptable parameters
         return False, {"status": "FLYING", "reason": ""}
     
-    def enable_flightgear(self, host='127.0.0.1', port=5550, rate=60):
+    def enable_flightgear(self, host= 'host.docker.internal', port=5550, rate=60):
         """
         Creates an output directive for FlightGear to receive the aircraft state via UDP.
         :param host: IP address to send the data to (default is localhost)

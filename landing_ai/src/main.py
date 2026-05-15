@@ -22,6 +22,6 @@ def test_agent_result(filename=None):
 
 if __name__ == "__main__":
     #test()
-    e_from_seed()
+    #e_from_seed()
     #e_from_gen0()
-    #test_agent_result(filename='2026-05-03_13-12-07_best_agent.pkl')
+    test_agent_result(filename='2026-05-03_13-12-07_best_agent.pkl')
