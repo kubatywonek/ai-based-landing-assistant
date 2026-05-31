@@ -19,9 +19,9 @@ PRESET_RUNWAYS = {
 }
 
 PRESET_CONDITIONS = {
-    "height": 524.0, # [ft]
+    "height": 786.0, # [ft] # zmiana na 786 i 15000 aby tang3 byl
     "velocity": 80.0, # [kts]
-    "distance": 10000.0, # [ft]
+    "distance": 15000.0, # [ft]
     "glide": -3.0, # [deg]
     "heading": 0.0 # [deg]
 }

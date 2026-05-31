@@ -166,7 +166,9 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
                 fitness += 1000                                                  # Bonus for proper flare at landing
             elif pitch < 0.0:
                 fitness -= 2000                                                  # Penalty for nose-down landing
-
+        elif "Grass" in info.get("reason", ""):
+            fitness += max(0, 5000 - abs(lat_error) * 20)                        # Reward for being close to centerline even if off-runway
+            fitness += max(0, 5000 - abs(math.degrees(heading_error)) * 100)     # Reward for correct heading even if off-runway
         elif info["status"] == "OUT_OF_BOUNDS":
             fitness -= 5000
             fitness += max(0, dist_ft - abs(distance))
@@ -187,12 +189,17 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
         ideal_vspeed = -h_speed * DISTANCE_COEFF                                # Ideal vertical speed based on horizontal speed to maintain glide slope
         if alt < 20:
             ideal_vspeed = -1.5
-        
+
+        if action[2] < 0.0:
+            fitness -= 2.0
+        else:
+            fitness += 1.0
+
         fitness -= math.sqrt(abs(v_speed - ideal_vspeed)) * 0.5                  # Penalty for vertical speed deviation from ideal glide slope descent rate
-        fitness -= min(0.15, abs(alt - ideal_alt) / 200.0)                     # Penalty for altitude deviation
-        fitness -= min(0.50, abs(lat_error) * 0.5)                                        # Penalty for lateral deviation
-        fitness -= min(0.25, abs(heading_error) * 3.0)                                     # Penalty for heading deviation
-        fitness -= min(0.15, abs(h_speed - 140.00) * 0.006)                                 # Penalty for horizontal speed deviation
+        fitness -= min(1.5, abs(alt - ideal_alt) / 100.0)                     # Penalty for altitude deviation
+        fitness -= min(5.0, abs(lat_error) * 0.1)                                        # Penalty for lateral deviation
+        fitness -= min(2.5, abs(heading_error) * 2.0)                                     # Penalty for heading deviation
+        fitness -= min(0.15, abs(h_speed - 125.00) * 0.006)                                 # Penalty for horizontal speed deviation
         fitness -= min(0.15, abs(roll) * 0.5)                                             # Penalty for roll angle
         fitness -= min(0.15, abs(pitch) * 0.01)                                            # Penalty for pitch angle
         fitness -= min(0.30, (abs(action[0])**2 + abs(action[1])**2) * 0.3)      # Penalty for excessive control inputs                                                 
@@ -202,9 +209,11 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
         
         delta_aileron = abs(action[0] - prev_action[0])
         delta_elevator = abs(action[1] - prev_action[1])
+        delta_throttle = abs(action[2] - prev_action[2])
         
-        fitness -= (delta_aileron ** 2) * 15.0
-        fitness -= (delta_elevator ** 2) * 15.0
+        fitness -= (delta_aileron ** 2) * 40.0
+        fitness -= (delta_elevator ** 2) * 40.0
+        fitness -= (delta_throttle ** 2) * 15.0
 
         if abs(heading_error) > math.radians(30):
             fitness -= 5.0                         # Anti-farming penalty for large heading errors
