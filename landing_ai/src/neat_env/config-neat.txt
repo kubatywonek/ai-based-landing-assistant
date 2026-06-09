@@ -8,7 +8,7 @@ seed = None
 
 [DefaultStagnation]
 species_fitness_func = max
-max_stagnation = 30
+max_stagnation = 25
 species_elitism = 1
 
 [DefaultReproduction]

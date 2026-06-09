@@ -17,7 +17,7 @@ GLIDE_RAND_RANGE = 0.75  # Maximum randomization coeff for angle of glide slope 
 DISTANCE_RAND_RANGE = 300  # Maximum randomization coeff for initial distance from threshold (in feet)
 DISTANCE_COEFF = math.tan(math.radians(3))  # Coefficient for ideal altitude based on distance to threshold (3 degrees glide slope)
 
-def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=100, randomize_level=0):
+def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=100, randomize_level=1):
     """
     Runs the NEAT evolutionary algorithm to train a landing assistant for the specified runway.
     :param from_seed: Path to a seed genome file to initialize the population. If None, starts with a random population.
@@ -95,6 +95,7 @@ def evaluate(genomes, config, env_config, randomize):
     :param env_config: Tuple containing runway and initial conditions.
     """
     runway, ic = env_config
+    #print("Dostepne klucze:", ic.keys())
     for genome_id, genome in genomes:
         
         # Randomization
@@ -105,8 +106,8 @@ def evaluate(genomes, config, env_config, randomize):
                 randomize = 0
             genome_ic = copy.deepcopy(ic)
             genome_ic["h_agl"] += random.uniform(-HEIGHT_RAND_RANGE*randomize, HEIGHT_RAND_RANGE*randomize)
-            genome_ic["heading"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
-            genome_ic["glide_slope"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
+            genome_ic["psi_true_deg"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
+            genome_ic["gamma_deg"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
             genome_ic["dist_ft"] += random.uniform(-DISTANCE_RAND_RANGE*randomize, DISTANCE_RAND_RANGE*randomize)
             env = FlightSimulator(runway_data=runway, initial_conditions=genome_ic)
         else:
