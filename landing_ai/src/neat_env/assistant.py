@@ -124,7 +124,7 @@ def evaluate(genomes, config, env_config, randomize):
         steps_left = MAX_STEPS
 
         while not done and steps_left > 0:
-            action = net.activate(state)
+            action = net.activate(list(state))
             state, done, info = env.step(action)
             genome.fitness += calculate_fitness(state, done, info, action, prev_action, ic["dist_ft"], steps_left)
             prev_action = action
@@ -166,7 +166,7 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
                 fitness -= 2000                                                  # Penalty for nose-down landing
         elif info["status"] == "CRASH":
             fitness -= 10000 * steps_left / MAX_STEPS
-            fitness += max(0, dist_ft - abs(distance)) * 1.5
+            fitness += max(0, dist_ft - abs(distance)) * 0.5
             if "Landed" in info.get("reason", ""):
                 fitness += max(0, 1500 - abs(lat_error) * 20)   # Reward for being close to centerline even if off-runway
                 fitness += max(0, 1500 - abs(math.degrees(heading_error)) * 100)    # Reward for correct heading even if off-runway
@@ -197,14 +197,7 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
         fitness -= abs(roll) * 0.02                                             # Penalty for roll angle
         fitness -= min(0.15, abs(pitch) * 0.01)                                            # Penalty for pitch angle
         fitness -= min(0.30, (abs(action[0])**2 + abs(action[1])**2) * 0.3)      # Penalty for excessive control inputs                                                 
-        
-        throttle = action[2]
-        if -0.1 <= throttle <= 0.35:
-            pass  
-        else:
-            dist_from_range = min(abs(throttle + 0.1), abs(throttle - 0.35))
-            fitness -= (dist_from_range ** 2) * 2.0  # Quadratic penalty for being outside the acceptable throttle range
-        
+     
         if abs(alt - ideal_alt) < 50 and v_speed > -1.0 and -distance > 100:    # Punish for floating and not descending
             fitness -= 4.0
         
@@ -214,22 +207,33 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
 
         fitness -= abs(delta_aileron) * 1.0
         fitness -= abs(delta_elevator) * 1.0
-        fitness -= abs(delta_throttle) * 0.5
+        fitness -= abs(delta_throttle) * 0.3
+
+        if h_speed < 130:
+            pass  # existing slow speed penalty handles this
+        elif h_speed <= 150:
+            fitness += (h_speed - 130) * 0.2  # reward up to target
+        else:
+            fitness -= (h_speed - 150) * 0.1   # too fast is also bad
 
         if abs(heading_error) > math.radians(30):
             fitness -= 5.0                         # Anti-farming penalty for large heading errors
         if distance > 300:
             fitness -= 5.0                         # Anti-farming penalty for being too far from the runway
         if abs(roll) > 15.0:
-            fitness -= (abs(roll) - 15.0) * 0.3                        # Anti-farming penalty for excessive roll
+            fitness -= (abs(roll) - 15.0) * 0.3    # Anti-farming penalty for excessive roll
         if abs(pitch) > 15.0:
             fitness -= 10.0                        # Anti-farming penalty for excessive pitch
         fitness -= abs(alt - ideal_alt) * 0.01     # Anti-farming penalty for being too high above the glide path
         if v_speed < -30.0:
             fitness -= 70.0                        # Anti-farming penalty for rapid descent
         if alt < 0:
-            fitness -= 10.0                       # Anti-farming penalty for going below ground level
-        
+            fitness -= 10.0                        # Anti-farming penalty for going below ground level
+
+        if abs(roll) > 45.0:
+            fitness -= 100.0
+        if abs(roll) > 90.0:
+            fitness -= 500.0
 
     if math.isnan(fitness) or math.isinf(fitness):
             return -5000.0

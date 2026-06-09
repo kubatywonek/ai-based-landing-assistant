@@ -200,7 +200,12 @@ class FlightSimulator:
             self.fdm['attitude/roll-rad'],                            # Roll
             long_dist,                                                # Dist to threshold
             lat_error,                                                # Lateral deviation
-            heading_error                                             # Heading error
+            heading_error,                                            # Heading error
+            self.fdm['velocities/q-rad_sec'],                         # pitch rate 
+            self.fdm['velocities/p-rad_sec'],                         # roll rate  
+            self.steer[0],                                            # actual aileron position 
+            self.steer[1],                                            # actual elevator position 
+            self.steer[2],                                            # actual throttle position 
         ]
         return np.array(state, dtype=np.float32)
 
@@ -255,8 +260,8 @@ class FlightSimulator:
             if v_speed < -10.0:
                 return True, {"status": "CRASH", "reason": f"Hard Landing (V-Speed: {v_speed:.1f} fps)"}
             
-            # Wing strike - roll angle too high at touchdown 
-            if abs(roll) > 0.26:
+            # Wing strike - roll angle too high at touchdown, changed to 0.15 to be much stricter
+            if abs(roll) > 0.15:
                 return True, {"status": "CRASH", "reason": "Wing Strike (Too much roll)"}
                 
             # Out of runway landing - the plane is too far from the centerline at touchdown

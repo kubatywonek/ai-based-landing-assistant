@@ -49,9 +49,10 @@ def test_agent(agent_path, steps=10000, Hz=5, enable_flightgear=False):
         if enable_flightgear:
             env.enable_flightgear() # Optional
         plane_state = env.reset()
+        prev_action = [0.0, 0.0, 0.1] # Initial action to get the plane moving
 
         for i in range(steps):
-            action = net.activate(plane_state)
+            action = net.activate(list(plane_state))
             logger.log({
                 'step': i,
                 'alt': plane_state[0],

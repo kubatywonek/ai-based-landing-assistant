@@ -12,12 +12,12 @@ max_stagnation = 30
 species_elitism = 1
 
 [DefaultReproduction]
-elitism = 1
+elitism = 2
 survival_threshold = 0.2
 min_species_size = 1
 
 [DefaultSpeciesSet]
-compatibility_threshold = 3.6
+compatibility_threshold = 2.9
 
 [DefaultGenome]
 activation_default = tanh
@@ -57,13 +57,13 @@ compatibility_weight_coefficient = 0.5
 compatibility_enable_penalty = 0.0
 
 conn_add_prob = 0.10
-conn_delete_prob = 0.05
+conn_delete_prob = 0.01
 node_add_prob = 0.02
-node_delete_prob = 0.01
+node_delete_prob = 0.001
 
 feed_forward = True
 initial_connection = full_direct
-num_inputs = 8
+num_inputs = 13 
 num_hidden = 4
 num_outputs = 3
 
