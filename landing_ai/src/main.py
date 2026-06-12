@@ -8,11 +8,11 @@ def test():
 
 def e_from_seed():
     local_dir = os.path.dirname(__file__)
-    base_agent = os.path.join(local_dir, 'neat_env', 'models', 'v7_landing_agent.pkl')
+    base_agent = os.path.join(local_dir, 'neat_env', 'models', 'v7.3_landing_agent.pkl')
     run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=30, from_seed=base_agent)
 
 def e_from_gen0():
-    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=200)
+    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=250)
 
 def test_agent_result(filename=None):
 
