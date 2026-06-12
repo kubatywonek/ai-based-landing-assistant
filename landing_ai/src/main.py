@@ -19,10 +19,10 @@ def test_agent_result(filename=None):
     if filename != None:
         local_dir = os.path.dirname(__file__)
         model_path = os.path.join(local_dir, 'neat_env', 'models', filename)
-        test_agent(agent_path=model_path, enable_flightgear=True, Hz=10, steps=7000)
+        test_agent(agent_path=model_path, enable_flightgear=True, Hz=10, steps=7000) # <- Tune the refresh rate to liking
 
 if __name__ == "__main__":
     #test()
     #e_from_seed()
     #e_from_gen0()
-    test_agent_result(filename='v7_landing_agent.pkl')
+    test_agent_result(filename='v7.3_landing_agent.pkl') # <- This is the last stable version (3) of the network

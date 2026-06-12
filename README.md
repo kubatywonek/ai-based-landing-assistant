@@ -1,20 +1,46 @@
 
 # AI-based landing assistant in a simplified aircraft approach simulation
 
-An algorithm that performs descent and landing on optimal flight descent path to the destination airport runway. Based on jsbsim flight physics engine and FlightGear for 3D visualization.
+Project that utilizes NEAT algorithm to train a network that performs descent and landing on optimal flight descent path to the destination airport runway within safety envelope. Based on JSBSim flight physics engine and FlightGear for 3D visualization.
 
 
 
 
-## Environment setting
+## Environment setting (non os depentent)
 
-#### Get required packages with conda
+#### Required packages ome with Docker container
 
 ```bash
-  conda env create -f environment.yml
+  requirements.txt / Dockerfile
 ```
 
-Recreate the environment landing-ai in VS Code.
+Download Docker Desktop application on your computer and install.
+
+Recreate the environment in Visual Studio Code through Dev Container extension from Microsoft.
+
+    1. Clone the repository
+
+    2. Open Visual Studio Code
+
+    3. Install Dev Containers extension in VS Code
+
+    4. Open the according folder on your computer
+
+    5. Press Ctrl + Shift + P or enter '>' in the command line of VS Code
+
+    6. Enter the command: >Dev Containers: Reopen in Container
+
+        If the environment does not open,
+        make sure you have Docker Desktop
+        application running in the background
+
+    *7. To run the filght with the 3D Visualization open fg_conf folder
+        and run the script accordingly to your operating system.
+        (You have to install FlightGear software manually!)
+
+    8. Run the program by typing in the VS Code terminal: 
+        cd landing_ai/src/
+        python main.py
 
 
 
@@ -22,7 +48,7 @@ Recreate the environment landing-ai in VS Code.
 
 If you wish to use optional 3D visualisation you need to download the os-corresponding version of [FlightGear flight simulator](https://www.flightgear.org).
 
-FlightGear needs to be running before any Python code. To run it properly use bash script in fg_conf directory:
+FlightGear needs to be running before any Python code. To run it properly for example on linux based system use bash script in fg_conf directory:
 
 ```bash
   ./fg_conf/fg_run.sh
