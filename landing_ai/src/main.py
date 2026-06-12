@@ -8,20 +8,21 @@ def test():
 
 def e_from_seed():
     local_dir = os.path.dirname(__file__)
-    base_agent = os.path.join(local_dir, 'neat_env', 'models', '-.pkl')
-    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=100, from_seed=base_agent)
+    base_agent = os.path.join(local_dir, 'neat_env', 'models', 'v7.3_landing_agent.pkl')
+    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=30, from_seed=base_agent)
 
 def e_from_gen0():
-    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=150)
+    run_evolution(learn_runway="KSEA (Seattle) - Runway 34R", generations=250)
 
 def test_agent_result(filename=None):
+
     if filename != None:
         local_dir = os.path.dirname(__file__)
         model_path = os.path.join(local_dir, 'neat_env', 'models', filename)
-        test_agent(agent_path=model_path, enable_flightgear=True, Hz=10, steps=7000)
+        test_agent(agent_path=model_path, enable_flightgear=True, Hz=10, steps=7000) # <- Tune the refresh rate to liking
 
 if __name__ == "__main__":
     #test()
     #e_from_seed()
     #e_from_gen0()
-    test_agent_result(filename='2026-05-01_16-44-57_best_agent.pkl')
+    test_agent_result(filename='v7.3_landing_agent.pkl') # <- This is the last stable version (3) of the network

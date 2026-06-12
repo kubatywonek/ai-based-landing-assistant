@@ -38,6 +38,8 @@ class Telemetry:
                 f.write(f"{self.step[i]},{self.alt[i]},{self.aileron[i]},{self.elevator[i]},{self.throttle[i]},{self.pitch[i]},{self.roll[i]}\n")
     
     def plot(self):
+        import matplotlib
+        matplotlib.use('Agg')
         fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
         fig.canvas.manager.set_window_title("Agent's flight telemetry report")
 
@@ -68,4 +70,13 @@ class Telemetry:
         axs[2].grid(True)
 
         plt.tight_layout()
-        plt.show()
+        local_path = os.path.dirname(__file__)
+        directory = os.path.join(local_path, "telemetry_logs")
+        os.makedirs(directory, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
+        save_path = os.path.join(directory, f"report-{timestamp}.png")
+        plt.savefig(save_path) 
+        plt.close(fig)         
+        
+        print(f"--- Report saved to: {save_path} ---")

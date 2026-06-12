@@ -49,9 +49,34 @@ def test_agent(agent_path, steps=10000, Hz=5, enable_flightgear=False):
         if enable_flightgear:
             env.enable_flightgear() # Optional
         plane_state = env.reset()
+        prev_action = [0.0, 0.0, 0.1] # Initial action to get the plane moving
+        """
+        smooth_elevator = 0.35   # heavy smoothing for pitch control
+        smooth_aileron = 0.4     # medium smoothing for roll
+        smooth_throttle = 0.8    # light smoothing, needs to respond quickly
+        smoothed_action = [0.0, 0.0, 0.1]  # ← add this
 
         for i in range(steps):
-            action = net.activate(plane_state)
+            raw_action = net.activate(list(plane_state))
+            smoothed_action = [
+                smoothed_action[0] * (1 - smooth_aileron)  + raw_action[0] * smooth_aileron,
+                smoothed_action[1] * (1 - smooth_elevator) + raw_action[1] * smooth_elevator,
+                smoothed_action[2] * (1 - smooth_throttle) + raw_action[2] * smooth_throttle,
+            ]
+            logger.log({
+                'step': i,
+                'alt': plane_state[0],
+                'aileron': smoothed_action[0],
+                'elevator': smoothed_action[1],
+                'throttle': smoothed_action[2],
+                'pitch': math.degrees(plane_state[3]),
+                'roll': math.degrees(plane_state[4])
+            })
+            plane_state, done, info = env.step(smoothed_action)
+        """
+        #"""
+        for i in range(steps):
+            action = net.activate(list(plane_state))
             logger.log({
                 'step': i,
                 'alt': plane_state[0],
@@ -62,6 +87,7 @@ def test_agent(agent_path, steps=10000, Hz=5, enable_flightgear=False):
                 'roll': math.degrees(plane_state[4])
             })
             plane_state, done, info = env.step(action)
+        #"""
             if i % 10 == 0:
                 print(f"Step {i}\n")
                 debug_agent(plane_state)

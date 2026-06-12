@@ -1,4 +1,4 @@
-from numpy import copy
+from numpy import copy, roll
 from sim_env.preflight_config import get_jsbsim_config
 from sim_env.jsbsim_wrapper import FlightSimulator
 import os
@@ -8,6 +8,7 @@ import random
 from datetime import datetime
 import math
 import glob
+import copy
 
 MAX_STEPS = 4000 # Maximum steps per try to prevent infinite loops
 HEIGHT_RAND_RANGE = 100  # Maximum randomization coeff for initial height (in feet)
@@ -16,7 +17,7 @@ GLIDE_RAND_RANGE = 0.75  # Maximum randomization coeff for angle of glide slope 
 DISTANCE_RAND_RANGE = 300  # Maximum randomization coeff for initial distance from threshold (in feet)
 DISTANCE_COEFF = math.tan(math.radians(3))  # Coefficient for ideal altitude based on distance to threshold (3 degrees glide slope)
 
-def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=100, randomize_level=0):
+def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=100, randomize_level=1):
     """
     Runs the NEAT evolutionary algorithm to train a landing assistant for the specified runway.
     :param from_seed: Path to a seed genome file to initialize the population. If None, starts with a random population.
@@ -60,8 +61,8 @@ def run_evolution(from_seed=None, resume=False, learn_runway=None, generations=1
         with open(from_seed, 'rb') as f:
             champion_genome = pickle.load(f)
         for genome_id, genome in new_population.population.items():
-            genome.nodes = champion_genome.nodes.copy()
-            genome.connections = champion_genome.connections.copy()
+            genome.nodes = copy.deepcopy(champion_genome.nodes)
+            genome.connections = copy.deepcopy(champion_genome.connections)
             genome.mutate(config.genome_config)
     else: 
         new_population = neat.Population(config)
@@ -94,6 +95,7 @@ def evaluate(genomes, config, env_config, randomize):
     :param env_config: Tuple containing runway and initial conditions.
     """
     runway, ic = env_config
+    #print("Dostepne klucze:", ic.keys())
     for genome_id, genome in genomes:
         
         # Randomization
@@ -104,8 +106,8 @@ def evaluate(genomes, config, env_config, randomize):
                 randomize = 0
             genome_ic = copy.deepcopy(ic)
             genome_ic["h_agl"] += random.uniform(-HEIGHT_RAND_RANGE*randomize, HEIGHT_RAND_RANGE*randomize)
-            genome_ic["heading"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
-            genome_ic["glide_slope"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
+            genome_ic["psi_true_deg"] += random.uniform(-HEADNG_RAND_RANGE*randomize, HEADNG_RAND_RANGE*randomize)
+            genome_ic["gamma_deg"] += random.uniform(-GLIDE_RAND_RANGE*randomize, GLIDE_RAND_RANGE*randomize)
             genome_ic["dist_ft"] += random.uniform(-DISTANCE_RAND_RANGE*randomize, DISTANCE_RAND_RANGE*randomize)
             env = FlightSimulator(runway_data=runway, initial_conditions=genome_ic)
         else:
@@ -123,15 +125,13 @@ def evaluate(genomes, config, env_config, randomize):
         steps_left = MAX_STEPS
 
         while not done and steps_left > 0:
-            action = net.activate(state)
+            action = net.activate(list(state))
             state, done, info = env.step(action)
             genome.fitness += calculate_fitness(state, done, info, action, prev_action, ic["dist_ft"], steps_left)
             prev_action = action
             steps_left -= 1
             if done:
                 print(f"Agent finished after {MAX_STEPS - steps_left} steps. Reason: {info['reason']}")
-
-
 
 def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_left):
     """
@@ -165,19 +165,22 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
                 fitness += 1000                                                  # Bonus for proper flare at landing
             elif pitch < 0.0:
                 fitness -= 2000                                                  # Penalty for nose-down landing
-
-        elif info["status"] == "OUT_OF_BOUNDS":
-            fitness -= 5000
-            fitness += max(0, dist_ft - abs(distance))
         elif info["status"] == "CRASH":
             fitness -= 10000 * steps_left / MAX_STEPS
-            fitness += max(0, dist_ft - abs(distance))
+            fitness += max(0, dist_ft - abs(distance)) * 0.5
+            if "Landed" in info.get("reason", ""):
+                fitness += max(0, 1500 - abs(lat_error) * 20)   # Reward for being close to centerline even if off-runway
+                fitness += max(0, 1500 - abs(math.degrees(heading_error)) * 100)    # Reward for correct heading even if off-runway
+                if "short or overran" in info.get("reason", ""):
+                    fitness += max(0, 3000 - abs(distance) * 0.5)                  
+        elif info["status"] == "OUT_OF_BOUNDS":
+            fitness -= 10000
         elif info["status"] == "ERROR":
             fitness -= 1000
         else:
             raise ValueError(f"Unknown status: {info['status']}")
     else: #Still flying
-        fitness += max(0.0, (dist_ft - abs(distance)) / dist_ft) * 3            # Small reward for surviving towards the runway
+        fitness += max(0.0, (dist_ft - abs(distance)) / dist_ft) * 0.5            # Small reward for surviving towards the runway
         fitness += max(0.0, 50 - abs(lat_error)) * 0.04                         # Small reward for being close to centerline
         fitness -= 0.05 * (MAX_STEPS - steps_left) / MAX_STEPS                  # Small penalty for taking more time to land
         fitness += 1.0
@@ -188,36 +191,50 @@ def calculate_fitness(state, done, info, action, prev_action, dist_ft, steps_lef
             ideal_vspeed = -1.5
         
         fitness -= math.sqrt(abs(v_speed - ideal_vspeed)) * 0.5                  # Penalty for vertical speed deviation from ideal glide slope descent rate
-        fitness -= min(0.15, abs(alt - ideal_alt) / 1000.0)                     # Penalty for altitude deviation
-        fitness -= min(0.50, abs(lat_error) * 0.05)                                        # Penalty for lateral deviation
+        fitness -= min(0.15, abs(alt - ideal_alt) / 200.0)                     # Penalty for altitude deviation
+        fitness -= min(0.50, abs(lat_error) * 0.5)                                        # Penalty for lateral deviation
         fitness -= min(0.25, abs(heading_error) * 3.0)                                     # Penalty for heading deviation
         fitness -= min(0.15, abs(h_speed - 140.00) * 0.006)                                 # Penalty for horizontal speed deviation
-        fitness -= min(0.15, abs(roll) * 0.02)                                             # Penalty for roll angle
+        fitness -= abs(roll) * 0.02                                             # Penalty for roll angle
         fitness -= min(0.15, abs(pitch) * 0.01)                                            # Penalty for pitch angle
         fitness -= min(0.30, (abs(action[0])**2 + abs(action[1])**2) * 0.3)      # Penalty for excessive control inputs                                                 
-
+     
         if abs(alt - ideal_alt) < 50 and v_speed > -1.0 and -distance > 100:    # Punish for floating and not descending
             fitness -= 4.0
         
         delta_aileron = abs(action[0] - prev_action[0])
         delta_elevator = abs(action[1] - prev_action[1])
-        
-        fitness -= (delta_aileron ** 2) * 2.0
-        fitness -= (delta_elevator ** 2) * 2.0
+        delta_throttle = abs(action[2] - prev_action[2])
+
+        fitness -= abs(delta_aileron) * 1.0
+        fitness -= abs(delta_elevator) * 1.0
+        fitness -= abs(delta_throttle) * 0.3
+
+        if h_speed < 130:
+            pass  # existing slow speed penalty handles this
+        elif h_speed <= 150:
+            fitness += (h_speed - 130) * 0.2  # reward up to target
+        else:
+            fitness -= (h_speed - 150) * 0.1   # too fast is also bad
 
         if abs(heading_error) > math.radians(30):
             fitness -= 5.0                         # Anti-farming penalty for large heading errors
         if distance > 300:
             fitness -= 5.0                         # Anti-farming penalty for being too far from the runway
-        if abs(roll) > 40.0:
-            fitness -= 10.0                        # Anti-farming penalty for excessive roll
+        if abs(roll) > 15.0:
+            fitness -= (abs(roll) - 15.0) * 0.3    # Anti-farming penalty for excessive roll
         if abs(pitch) > 15.0:
             fitness -= 10.0                        # Anti-farming penalty for excessive pitch
-        if alt > ideal_alt + 1000:
-            fitness -= 10.0                        # Anti-farming penalty for being too high above the glide path
+        fitness -= abs(alt - ideal_alt) * 0.01     # Anti-farming penalty for being too high above the glide path
         if v_speed < -30.0:
             fitness -= 70.0                        # Anti-farming penalty for rapid descent
-        
+        if alt < 0:
+            fitness -= 10.0                        # Anti-farming penalty for going below ground level
+
+        if abs(roll) > 45.0:
+            fitness -= 100.0
+        if abs(roll) > 90.0:
+            fitness -= 500.0
 
     if math.isnan(fitness) or math.isinf(fitness):
             return -5000.0

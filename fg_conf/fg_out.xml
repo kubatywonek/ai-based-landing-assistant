@@ -1,4 +1,4 @@
 <?xml version="1.0"?>
-        <output name="127.0.0.1" type="FLIGHTGEAR" port="5550" protocol="UDP" rate="60">
+        <output name="host.docker.internal" type="FLIGHTGEAR" port="5550" protocol="UDP" rate="60">
         </output>
         
